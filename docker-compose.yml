@@ -1,0 +1,111 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: secret
+      MYSQL_DATABASE: room_booking
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/var/www/html
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DB_HOST: mysql
+      DB_DATABASE: room_booking
+      DB_USERNAME: root
+      DB_PASSWORD: secret
+      REDIS_HOST: redis
+      FACE_SERVICE_URL: http://face-service:8001
+      FACE_SERVICE_SECRET: change-me-in-production
+
+  queue-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: php artisan queue:work redis --tries=3 --timeout=90
+    volumes:
+      - ./backend:/var/www/html
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DB_HOST: mysql
+      DB_DATABASE: room_booking
+      DB_USERNAME: root
+      DB_PASSWORD: secret
+      REDIS_HOST: redis
+
+  scheduler:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: php artisan schedule:work
+    volumes:
+      - ./backend:/var/www/html
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DB_HOST: mysql
+      DB_DATABASE: room_booking
+      DB_USERNAME: root
+      DB_PASSWORD: secret
+      REDIS_HOST: redis
+
+  face-service:
+    build:
+      context: ./face-service
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      FACE_SERVICE_SECRET: change-me-in-production
+      EMBEDDING_ENCRYPTION_KEY: placeholder-key
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+volumes:
+  mysql_data:

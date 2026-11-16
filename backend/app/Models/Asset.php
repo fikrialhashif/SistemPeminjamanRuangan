@@ -1,0 +1,27 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+class Asset extends Model
+{
+    protected $fillable = [
+        'resource_id',
+        'code',
+        'condition',
+        'status',
+    ];
+
+    public function resource(): BelongsTo
+    {
+        return $this->belongsTo(Resource::class);
+    }
+
+    public function loans(): HasMany
+    {
+        return $this->hasMany(AssetLoan::class);
+    }
+}
