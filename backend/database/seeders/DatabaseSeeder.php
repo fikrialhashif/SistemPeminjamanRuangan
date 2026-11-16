@@ -31,9 +31,9 @@ class DatabaseSeeder extends Seeder
         ])->map(fn ($d) => Department::firstOrCreate(['code' => $d['code']], $d));
 
         $locations = collect([
-            ['name' => 'Gedung A', 'address' => 'Lantai 1, Gedung A'],
-            ['name' => 'Gedung B', 'address' => 'Lantai 2, Gedung B'],
-            ['name' => 'Gedung C', 'address' => 'Lantai 1, Gedung C'],
+            ['name' => 'Gedung A', 'address' => 'Lantai 1, Gedung A', 'latitude' => -6.2088000, 'longitude' => 106.8456000, 'radius' => 100],
+            ['name' => 'Gedung B', 'address' => 'Lantai 2, Gedung B', 'latitude' => -6.2092000, 'longitude' => 106.8460000, 'radius' => 100],
+            ['name' => 'Gedung C', 'address' => 'Lantai 1, Gedung C', 'latitude' => -6.2095000, 'longitude' => 106.8465000, 'radius' => 150],
         ])->map(fn ($l) => Location::firstOrCreate(['name' => $l['name']], $l));
 
         $admin = User::firstOrCreate(
