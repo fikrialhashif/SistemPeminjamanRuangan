@@ -27,6 +27,10 @@ class _ResourcesPageState extends ConsumerState<ResourcesPage> {
             onPressed: () => context.push('/bookings'),
             icon: const Icon(Icons.event_note),
           ),
+          IconButton(
+            onPressed: () => context.push('/approvals'),
+            icon: const Icon(Icons.approval),
+          ),
         ],
       ),
       body: Column(

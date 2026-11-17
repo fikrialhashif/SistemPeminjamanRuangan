@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'features/auth/presentation/login_page.dart';
 import 'features/bookings/presentation/booking_form_page.dart';
 import 'features/bookings/presentation/my_bookings_page.dart';
+import 'features/approvals/presentation/approvals_page.dart';
 import 'features/resources/presentation/resources_page.dart';
 
 final _router = GoRouter(
@@ -16,6 +17,10 @@ final _router = GoRouter(
     GoRoute(
       path: '/bookings',
       builder: (context, state) => const MyBookingsPage(),
+    ),
+    GoRoute(
+      path: '/approvals',
+      builder: (context, state) => const ApprovalsPage(),
     ),
     GoRoute(
       path: '/bookings/new/:resourceId',
