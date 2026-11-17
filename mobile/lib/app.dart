@@ -3,6 +3,9 @@ import 'package:go_router/go_router.dart';
 
 import 'features/auth/presentation/login_page.dart';
 import 'features/bookings/presentation/booking_form_page.dart';
+import 'features/bookings/presentation/bundled_booking_page.dart';
+import 'features/bookings/presentation/recurring_booking_page.dart';
+import 'features/bookings/presentation/waitlist_page.dart';
 import 'features/bookings/presentation/my_bookings_page.dart';
 import 'features/check_in/presentation/check_in_page.dart';
 import 'features/face/presentation/face_enrollment_page.dart';
@@ -35,6 +38,20 @@ final _router = GoRouter(
       path: '/bookings/:bookingId/check-in',
       builder: (context, state) =>
           CheckInPage(bookingId: state.pathParameters['bookingId']!),
+    ),
+    GoRoute(
+      path: '/bookings/bundled',
+      builder: (context, state) => const BundledBookingPage(),
+    ),
+    GoRoute(
+      path: '/bookings/:bookingId/waitlist',
+      builder: (context, state) =>
+          WaitlistPage(bookingId: state.pathParameters['bookingId']!),
+    ),
+    GoRoute(
+      path: '/bookings/recurring/:resourceId',
+      builder: (context, state) =>
+          RecurringBookingPage(resourceId: state.pathParameters['resourceId']!),
     ),
     GoRoute(
       path: '/bookings/new/:resourceId',

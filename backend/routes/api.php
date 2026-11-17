@@ -25,8 +25,12 @@ Route::prefix('v1')->group(function () {
         Route::get('resources/{resource}/availability', [ResourceController::class, 'availability']);
 
         Route::apiResource('bookings', BookingController::class)->only(['index', 'store', 'show', 'destroy']);
+        Route::post('bookings/recurring', [BookingController::class, 'recurring']);
+        Route::post('bookings/bundled', [BookingController::class, 'bundled']);
         Route::post('bookings/{booking}/check-in', [BookingController::class, 'checkIn']);
         Route::post('bookings/{booking}/waitlist', [BookingController::class, 'waitlist']);
+        Route::post('waitlist/{waitlistEntry}/claim', [BookingController::class, 'claimWaitlist']);
+        Route::post('waitlist/{waitlistEntry}/decline', [BookingController::class, 'declineWaitlist']);
 
         Route::get('approvals/pending', [ApprovalController::class, 'pending']);
         Route::post('approvals/{approval}/approve', [ApprovalController::class, 'approve']);
