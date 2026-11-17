@@ -9,6 +9,8 @@ import 'features/face/presentation/face_enrollment_page.dart';
 import 'features/approvals/presentation/approvals_page.dart';
 import 'features/resources/presentation/resources_page.dart';
 import 'features/loans/presentation/manager_loans_page.dart';
+import 'features/notifications/presentation/notifications_page.dart';
+import 'features/notifications/presentation/penalties_page.dart';
 
 final _router = GoRouter(
   routes: [
@@ -42,6 +44,14 @@ final _router = GoRouter(
     GoRoute(
       path: '/manager/loans',
       builder: (context, state) => const ManagerLoansPage(),
+    ),
+    GoRoute(
+      path: '/notifications',
+      builder: (context, state) => const NotificationsPage(),
+    ),
+    GoRoute(
+      path: '/penalties',
+      builder: (context, state) => const PenaltiesPage(),
     ),
   ],
 );

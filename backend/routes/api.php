@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\BookingController;
 use App\Http\Controllers\Api\V1\FaceController;
 use App\Http\Controllers\Api\V1\LoanController;
 use App\Http\Controllers\Api\V1\LocationController;
+use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\PenaltyController;
 use App\Http\Controllers\Api\V1\ReportController;
 use App\Http\Controllers\Api\V1\ResourceController;
@@ -42,6 +43,8 @@ Route::prefix('v1')->group(function () {
         Route::post('loans/{loan}/override', [LoanController::class, 'override']);
 
         Route::get('me/strikes', [PenaltyController::class, 'strikes']);
+        Route::get('notifications', [NotificationController::class, 'index']);
+        Route::post('notifications/device-token', [NotificationController::class, 'registerToken']);
 
         Route::middleware('role:admin')->group(function () {
             Route::apiResource('locations', LocationController::class);

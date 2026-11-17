@@ -58,6 +58,11 @@ class User extends Authenticatable
         return $this->hasMany(Strike::class);
     }
 
+    public function deviceTokens(): HasMany
+    {
+        return $this->hasMany(DeviceToken::class);
+    }
+
     public function suspensions(): HasMany
     {
         return $this->hasMany(Suspension::class);
