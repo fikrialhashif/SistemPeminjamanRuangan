@@ -12,7 +12,7 @@ class FaceVerificationService
     private function client(): PendingRequest
     {
         return Http::baseUrl(config('services.face.url'))
-            ->withHeaders(['X-Api-Key' => config('services.face.secret')])
+            ->withHeaders(['X-Service-Secret' => config('services.face.secret')])
             ->timeout(15);
     }
 

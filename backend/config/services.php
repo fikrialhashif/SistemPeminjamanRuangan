@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    'face' => [
+        'url' => env('FACE_SERVICE_URL', 'http://localhost:8001'),
+        'secret' => env('FACE_SERVICE_SECRET'),
+    ],
+
 ];
