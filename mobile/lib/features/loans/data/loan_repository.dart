@@ -71,6 +71,21 @@ class LoanRepository {
     }
   }
 
+  Future<Map<String, dynamic>> overrideVerification({
+    required String loanId,
+    required String reason,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '/loans/$loanId/override',
+        data: {'reason': reason},
+      );
+      return Map<String, dynamic>.from(response.data as Map);
+    } catch (error) {
+      throw mapDioError(error);
+    }
+  }
+
   Future<Map<String, dynamic>> reportDamage({
     required String loanId,
     required String notes,

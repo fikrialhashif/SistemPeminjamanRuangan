@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api\V1;
 use App\Enums\LoanStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\HandoverRequest;
+use App\Http\Requests\LoanOverrideRequest;
 use App\Http\Requests\ReturnRequest;
+use Illuminate\Support\Facades\DB;
 use App\Models\AssetLoan;
 use App\Models\ConditionReport;
 use App\Models\LoanEvent;
@@ -99,6 +101,29 @@ class LoanController extends Controller
         ]);
 
         return response()->json($assetLoan->fresh(['asset', 'conditionReports']));
+    }
+
+    public function override(LoanOverrideRequest $request, AssetLoan $assetLoan): JsonResponse
+    {
+        if (! in_array($assetLoan->status, [LoanStatus::RESERVED, LoanStatus::HANDED_OVER, LoanStatus::IN_USE], true)) {
+            return response()->json(['message' => 'Loan cannot be overridden in current state.'], 422);
+        }
+
+        DB::transaction(function () use ($request, $assetLoan) {
+            $assetLoan->update([
+                'status' => LoanStatus::HANDED_OVER,
+                'handed_over_at' => $assetLoan->handed_over_at ?? now(),
+            ]);
+
+            LoanEvent::create([
+                'asset_loan_id' => $assetLoan->id,
+                'event_type' => 'verification_override',
+                'actor_id' => $request->user()->id,
+                'data' => ['reason' => $request->validated('reason')],
+            ]);
+        });
+
+        return response()->json($assetLoan->fresh(['asset', 'events']));
     }
 
     public function reportDamage(Request $request, AssetLoan $assetLoan): JsonResponse

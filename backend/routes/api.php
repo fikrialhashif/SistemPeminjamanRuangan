@@ -39,6 +39,7 @@ Route::prefix('v1')->group(function () {
         Route::post('loans/{loan}/handover', [LoanController::class, 'handover']);
         Route::post('loans/{loan}/return', [LoanController::class, 'returnAsset']);
         Route::post('loans/{loan}/damage', [LoanController::class, 'reportDamage']);
+        Route::post('loans/{loan}/override', [LoanController::class, 'override']);
 
         Route::get('me/strikes', [PenaltyController::class, 'strikes']);
 

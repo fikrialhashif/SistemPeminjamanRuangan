@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/loan_repository.dart';
+import 'override_page.dart';
 
 final loansProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((
   ref,
@@ -72,6 +73,13 @@ class LoanActionPage extends StatelessWidget {
                 MaterialPageRoute(builder: (_) => HandoverPage(loanId: loanId)),
               ),
               child: const Text('Serah-terima aset'),
+            ),
+          if (status == 'reserved')
+            OutlinedButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => OverridePage(loanId: loanId)),
+              ),
+              child: const Text('Override manual'),
             ),
           if (status == 'handed_over' || status == 'in_use')
             ElevatedButton(
