@@ -1,96 +1,127 @@
 @extends('admin.layout')
 
+@section('title', 'Ruangan & aset')
+
 @section('content')
-<div class="flex justify-between items-center mb-6">
-    <h1 class="text-2xl font-bold">Resources</h1>
-    <button onclick="document.getElementById('createModal').classList.remove('hidden')" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Add Resource</button>
-</div>
-
-<div class="bg-white rounded-lg shadow overflow-x-auto">
-    <table class="w-full text-left">
-        <thead class="bg-gray-50 border-b">
-            <tr>
-                <th class="px-6 py-3 text-sm font-medium text-gray-500">ID</th>
-                <th class="px-6 py-3 text-sm font-medium text-gray-500">Name</th>
-                <th class="px-6 py-3 text-sm font-medium text-gray-500">Type</th>
-                <th class="px-6 py-3 text-sm font-medium text-gray-500">Location</th>
-                <th class="px-6 py-3 text-sm font-medium text-gray-500">Category</th>
-                <th class="px-6 py-3 text-sm font-medium text-gray-500">Details</th>
-                <th class="px-6 py-3 text-sm font-medium text-gray-500">Active</th>
-            </tr>
-        </thead>
-        <tbody class="divide-y">
-            @forelse($resources as $resource)
-                <tr>
-                    <td class="px-6 py-4">{{ $resource->id }}</td>
-                    <td class="px-6 py-4">{{ $resource->name }}</td>
-                    <td class="px-6 py-4">
-                        <span class="px-2 py-1 rounded text-xs font-medium {{ $resource->type->value === 'room' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800' }}">
-                            {{ $resource->type->value }}
-                        </span>
-                    </td>
-                    <td class="px-6 py-4">{{ $resource->location->name ?? '-' }}</td>
-                    <td class="px-6 py-4">{{ $resource->category ?? '-' }}</td>
-                    <td class="px-6 py-4 text-sm text-gray-600">
-                        @if($resource->room)
-                            Capacity: {{ $resource->room->capacity }}
-                        @elseif($resource->asset)
-                            Code: {{ $resource->asset->code }}, {{ $resource->asset->condition }}
-                        @else
-                            -
-                        @endif
-                    </td>
-                    <td class="px-6 py-4">
-                        <span class="inline-block w-3 h-3 rounded-full {{ $resource->is_active ? 'bg-green-500' : 'bg-red-500' }}"></span>
-                    </td>
-                </tr>
-            @empty
-                <tr>
-                    <td colspan="7" class="px-6 py-8 text-center text-gray-500">No resources found.</td>
-                </tr>
-            @endforelse
-        </tbody>
-    </table>
-</div>
-<div class="mt-4">{{ $resources->links() }}</div>
-
-<div id="createModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg shadow-lg w-full max-w-md p-6">
-        <div class="flex justify-between items-center mb-4">
-            <h2 class="text-xl font-bold">Add Resource</h2>
-            <button onclick="document.getElementById('createModal').classList.add('hidden')" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+    <header class="plate">
+        <div>
+            <h1 class="plate-title">Ruangan &amp; aset</h1>
+            <p class="plate-desc">Daftar ruangan dan aset yang bisa dipinjam, beserta statusnya.</p>
         </div>
-        <form method="POST" action="{{ route('admin.resources.store') }}">
-            @csrf
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                <input type="text" name="name" required class="w-full border border-gray-300 rounded px-3 py-2">
+        <div class="plate-aside">
+            <div class="plate-stat">
+                <span class="plate-stat-value">{{ number_format($resources->total(), 0, ',', '.') }}</span>
+                <span class="plate-stat-label">terdaftar</span>
             </div>
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                <select name="type" required class="w-full border border-gray-300 rounded px-3 py-2">
-                    <option value="room">Room</option>
-                    <option value="asset">Asset</option>
-                </select>
+            <button type="button" class="btn btn--onplate" data-open-dialog="createResource">Tambah ruangan atau aset</button>
+        </div>
+    </header>
+
+    <section class="panel">
+        @if($resources->isEmpty())
+            <div class="empty">
+                <p class="empty-title">Belum ada ruangan atau aset.</p>
+                <p>Tambahkan data pertama supaya bisa dipinjam lewat aplikasi.</p>
+                <button type="button" class="btn btn--primary" data-open-dialog="createResource">Tambah yang pertama</button>
             </div>
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
-                <select name="location_id" required class="w-full border border-gray-300 rounded px-3 py-2">
-                    @foreach($locations as $location)
-                        <option value="{{ $location->id }}">{{ $location->name }}</option>
-                    @endforeach
-                </select>
+        @else
+            <div class="table-wrap">
+                <table class="data data--stack">
+                    <thead>
+                        <tr>
+                            <th scope="col">Nama</th>
+                            <th scope="col">Jenis</th>
+                            <th scope="col">Lokasi</th>
+                            <th scope="col">Detail</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($resources as $resource)
+                            <tr>
+                                <td data-label="Nama">
+                                    <div class="cell-title">{{ $resource->name }}</div>
+                                    @if($resource->category)
+                                        <div class="cell-sub">{{ $resource->category }}</div>
+                                    @endif
+                                </td>
+                                <td data-label="Jenis">
+                                    @if($resource->type->value === 'room')
+                                        <span class="tag">Ruangan</span>
+                                    @else
+                                        <span class="tag tag--amber">Aset</span>
+                                    @endif
+                                </td>
+                                <td data-label="Lokasi">{{ $resource->location->name ?? 'Belum diatur' }}</td>
+                                <td data-label="Detail">
+                                    @if($resource->room)
+                                        <span>Kapasitas {{ $resource->room->capacity }} orang</span>
+                                    @elseif($resource->asset)
+                                        <span>Kode {{ $resource->asset->code }}</span>
+                                        <div class="cell-sub">Kondisi: {{ $resource->asset->condition }}</div>
+                                    @else
+                                        <span class="cell-muted">Belum ada detail</span>
+                                    @endif
+                                </td>
+                                <td data-label="Status">
+                                    <span class="status">
+                                        <span class="dot {{ $resource->is_active ? '' : 'dot--muted' }}" aria-hidden="true"></span>
+                                        {{ $resource->is_active ? 'Aktif' : 'Nonaktif' }}
+                                    </span>
+                                </td>
+                                <td data-label="Aksi" class="data-actions">
+                                    <div class="cell-actions">
+                                        <a class="btn btn--ghost btn--sm" href="{{ route('admin.resources.edit', $resource) }}">Edit</a>
+                                        <a class="btn btn--ghost btn--sm" href="{{ route('resources.qr', $resource) }}" target="_blank" rel="noopener">QR</a>
+                                        <form method="POST" action="{{ route('admin.resources.toggle', $resource) }}">
+                                            @csrf
+                                            @method('PATCH')
+                                            <button type="submit" class="btn btn--ghost btn--sm">{{ $resource->is_active ? 'Nonaktifkan' : 'Aktifkan' }}</button>
+                                        </form>
+                                        @if(auth()->user()->isAdmin())
+                                            <form method="POST" action="{{ route('admin.resources.destroy', $resource) }}" data-confirm="Hapus {{ $resource->name }}? Data akan dihapus dari daftar.">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn--reject btn--sm">Hapus</button>
+                                            </form>
+                                        @endif
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
             </div>
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                <input type="text" name="category" class="w-full border border-gray-300 rounded px-3 py-2">
+        @endif
+    </section>
+
+    {{ $resources->links() }}
+
+    <dialog id="createResource" class="modal" aria-labelledby="createResourceTitle">
+        <div class="modal-head">
+            <div>
+                <h2 class="modal-title" id="createResourceTitle">Tambah ruangan atau aset</h2>
+                <p class="modal-desc">Isi detail resource dan aturan booking agar langsung bisa dipinjam.</p>
             </div>
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                <textarea name="description" rows="3" class="w-full border border-gray-300 rounded px-3 py-2"></textarea>
-            </div>
-            <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 font-medium">Create</button>
-        </form>
-    </div>
-</div>
+            <button type="button" class="modal-close" data-close-dialog aria-label="Tutup dialog">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form method="POST" action="{{ route('admin.resources.store') }}">
+                @csrf
+                @include('admin.partials.resource-fields', ['resource' => null, 'locations' => $locations, 'isEdit' => false])
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn--ghost" data-close-dialog>Batal</button>
+                    <button type="submit" class="btn btn--primary">Simpan</button>
+                </div>
+            </form>
+        </div>
+    </dialog>
+
+    @if($errors->any())
+        <script>
+            document.getElementById('createResource').showModal();
+        </script>
+    @endif
 @endsection

@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Room extends Model
 {
+    use Auditable;
+
     protected $fillable = [
         'resource_id',
         'capacity',

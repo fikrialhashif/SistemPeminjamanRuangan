@@ -10,8 +10,12 @@ use App\Models\Booking;
 use App\Models\Location;
 use App\Models\Resource;
 use App\Models\Strike;
+use App\Services\ApprovalService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class AdminController extends Controller
 {
@@ -36,7 +40,7 @@ class AdminController extends Controller
             if (! $hasRole) {
                 Auth::logout();
 
-                return back()->withErrors(['email' => 'Unauthorized access.']);
+                return back()->withErrors(['email' => 'Akun ini tidak punya akses ke panel admin.']);
             }
 
             $request->session()->regenerate();
@@ -44,7 +48,7 @@ class AdminController extends Controller
             return redirect()->route('admin.dashboard');
         }
 
-        return back()->withErrors(['email' => 'Invalid credentials.'])->onlyInput('email');
+        return back()->withErrors(['email' => 'Email atau kata sandi salah.'])->onlyInput('email');
     }
 
     public function logout(Request $request)
@@ -63,45 +67,67 @@ class AdminController extends Controller
             'pendingApprovals' => Approval::where('status', 'pending')->count(),
             'activeResources' => Resource::where('is_active', true)->count(),
             'totalStrikes' => Strike::count(),
+            'recentApprovals' => Approval::where('status', 'pending')
+                ->with(['booking.user', 'booking.resource'])
+                ->latest()
+                ->limit(4)
+                ->get(),
         ]);
     }
 
-    public function approvals()
+    public function approvals(Request $request)
     {
-        $approvals = Approval::where('status', 'pending')
+        $canDecide = $this->canDecideApprovals($request);
+
+        $approvals = Approval::actionable()
             ->with(['booking.user', 'booking.resource'])
             ->latest()
             ->paginate(20);
 
-        return view('admin.approvals', compact('approvals'));
+        return view('admin.approvals', compact('approvals', 'canDecide'));
     }
 
-    public function approve(Request $request, Approval $approval)
+    public function approve(Request $request, Approval $approval, ApprovalService $approvalService)
     {
-        $approval->update([
-            'status' => 'approved',
-            'approver_id' => Auth::id(),
-            'notes' => $request->input('notes'),
-            'decided_at' => now(),
-        ]);
+        $this->ensureCanDecideApprovals($request);
 
-        return back()->with('success', 'Approval approved.');
+        try {
+            $approvalService->approve($approval, $request->user(), $request->input('notes'));
+        } catch (ValidationException $exception) {
+            return back()->withErrors($exception->errors());
+        }
+
+        return back()->with('success', 'Permintaan disetujui.');
     }
 
-    public function reject(Request $request, Approval $approval)
+    public function reject(Request $request, Approval $approval, ApprovalService $approvalService)
     {
-        $approval->update([
-            'status' => 'rejected',
-            'approver_id' => Auth::id(),
-            'notes' => $request->input('notes'),
-            'decided_at' => now(),
-        ]);
+        $this->ensureCanDecideApprovals($request);
 
-        return back()->with('success', 'Approval rejected.');
+        try {
+            $approvalService->reject($approval, $request->user(), $request->input('notes'));
+        } catch (ValidationException $exception) {
+            return back()->withErrors($exception->errors());
+        }
+
+        return back()->with('success', 'Permintaan ditolak.');
+    }
+
+    private function canDecideApprovals(Request $request): bool
+    {
+        return $request->user()->isAdmin()
+            || $request->user()->hasRole(Role::APPROVER->value);
+    }
+
+    private function ensureCanDecideApprovals(Request $request): void
+    {
+        abort_unless($this->canDecideApprovals($request), 403, 'Hanya approver yang bisa memutuskan permintaan.');
     }
 
     public function resources()
     {
+        $this->ensureCanManageResources();
+
         $resources = Resource::with(['location', 'room', 'asset'])->latest()->paginate(20);
         $locations = Location::all();
 
@@ -110,23 +136,235 @@ class AdminController extends Controller
 
     public function storeResource(Request $request)
     {
-        $validated = $request->validate([
+        $this->ensureCanManageResources();
+
+        $validated = $request->validate($this->resourceValidationRules($request));
+
+        DB::transaction(function () use ($validated) {
+            $resource = Resource::create([
+                'name' => $validated['name'],
+                'type' => $validated['type'],
+                'location_id' => $validated['location_id'],
+                'category' => $validated['category'] ?? null,
+                'description' => $validated['description'] ?? null,
+                'is_active' => true,
+            ]);
+
+            if ($resource->type->value === 'room') {
+                $facilities = collect(explode(',', $validated['facilities_text'] ?? ''))
+                    ->map(fn (string $facility) => trim($facility))
+                    ->filter()
+                    ->values()
+                    ->all();
+
+                $resource->room()->create([
+                    'capacity' => $validated['capacity'],
+                    'facilities' => $facilities ?: null,
+                    'open_time' => $validated['open_time'] ?? null,
+                    'close_time' => $validated['close_time'] ?? null,
+                ]);
+            }
+
+            if ($resource->type->value === 'asset') {
+                $resource->asset()->create([
+                    'code' => $validated['code'],
+                    'condition' => $validated['condition'] ?? 'good',
+                ]);
+            }
+
+            $resource->rules()->create([
+                'buffer_minutes' => $validated['buffer_minutes'] ?? 0,
+                'min_duration_minutes' => $validated['min_duration_minutes'] ?? 30,
+                'max_duration_minutes' => $validated['max_duration_minutes'] ?? 480,
+                'advance_booking_days' => $validated['advance_booking_days'] ?? 30,
+                'approval_path' => $validated['approval_path'] ?? 'none',
+                'cancellation_minutes_before' => $validated['cancellation_minutes_before'] ?? 60,
+            ]);
+        });
+
+        return back()->with('success', 'Ruangan atau aset ditambahkan.');
+    }
+
+    public function editResource(Resource $resource)
+    {
+        $this->ensureCanManageResources();
+
+        $locations = Location::orderBy('name')->get();
+
+        return view('admin.resource-edit', compact('resource', 'locations'));
+    }
+
+    public function updateResource(Request $request, Resource $resource)
+    {
+        $this->ensureCanManageResources();
+
+        $validated = $request->validate($this->resourceValidationRules($request, $resource));
+
+        DB::transaction(function () use ($validated, $resource) {
+            $resource->update([
+                'name' => $validated['name'],
+                'location_id' => $validated['location_id'],
+                'category' => $validated['category'] ?? null,
+                'description' => $validated['description'] ?? null,
+            ]);
+
+            if ($resource->type->value === 'room') {
+                $resource->room()->updateOrCreate([], [
+                    'capacity' => $validated['capacity'],
+                    'facilities' => $this->facilitiesFromText($validated['facilities_text'] ?? ''),
+                    'open_time' => $validated['open_time'] ?? null,
+                    'close_time' => $validated['close_time'] ?? null,
+                ]);
+            }
+
+            if ($resource->type->value === 'asset') {
+                $resource->asset()->updateOrCreate([], [
+                    'code' => $validated['code'],
+                    'condition' => $validated['condition'] ?? 'good',
+                ]);
+            }
+
+            $resource->rules()->updateOrCreate([], [
+                'buffer_minutes' => $validated['buffer_minutes'] ?? 0,
+                'min_duration_minutes' => $validated['min_duration_minutes'] ?? 30,
+                'max_duration_minutes' => $validated['max_duration_minutes'] ?? 480,
+                'advance_booking_days' => $validated['advance_booking_days'] ?? 30,
+                'approval_path' => $validated['approval_path'] ?? 'none',
+                'cancellation_minutes_before' => $validated['cancellation_minutes_before'] ?? 60,
+            ]);
+        });
+
+        return redirect()->route('admin.resources')->with('success', 'Ruangan atau aset diperbarui.');
+    }
+
+    public function toggleResource(Resource $resource)
+    {
+        $this->ensureCanManageResources();
+
+        $resource->update(['is_active' => ! $resource->is_active]);
+
+        return back()->with('success', $resource->is_active ? 'Resource diaktifkan.' : 'Resource dinonaktifkan.');
+    }
+
+    public function destroyResource(Resource $resource)
+    {
+        $this->ensureAdmin();
+
+        $hasActiveBookings = $resource->bookings()
+            ->whereIn('status', ['pending', 'approved', 'checked_in'])
+            ->where('ends_at', '>=', now())
+            ->exists();
+
+        if ($hasActiveBookings) {
+            return back()->withErrors(['resource' => 'Resource masih punya booking aktif. Selesaikan atau batalkan booking terlebih dahulu.']);
+        }
+
+        $resource->delete();
+
+        return back()->with('success', 'Resource dihapus.');
+    }
+
+    public function audit(Request $request)
+    {
+        $query = AuditLog::with('user')->latest();
+
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('action', 'like', "%{$search}%")
+                    ->orWhere('auditable_type', 'like', "%{$search}%")
+                    ->orWhereHas('user', function ($q) use ($search) {
+                        $q->where('name', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        if ($request->filled('action')) {
+            $query->where('action', $request->input('action'));
+        }
+
+        if ($request->filled('type')) {
+            $query->where('auditable_type', $request->input('type'));
+        }
+
+        if ($request->filled('from')) {
+            $query->whereDate('created_at', '>=', $request->input('from'));
+        }
+
+        if ($request->filled('to')) {
+            $query->whereDate('created_at', '<=', $request->input('to'));
+        }
+
+        $logs = $query->paginate(30)->withQueryString();
+        $actions = AuditLog::query()->distinct()->orderBy('action')->pluck('action');
+        $types = AuditLog::query()->distinct()->pluck('auditable_type')
+            ->filter()
+            ->mapWithKeys(fn (string $type) => [$type => class_basename($type)]);
+
+        return view('admin.audit', compact('logs', 'actions', 'types'));
+    }
+
+    private function resourceValidationRules(Request $request, ?Resource $resource = null): array
+    {
+        $type = $request->input('type', $resource?->type?->value);
+
+        $rules = [
             'name' => ['required', 'string', 'max:255'],
-            'type' => ['required', 'in:room,asset'],
+            'type' => ['required', Rule::in($resource ? [$resource->type->value] : ['room', 'asset'])],
             'location_id' => ['required', 'exists:locations,id'],
             'category' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
-        ]);
+            'buffer_minutes' => ['nullable', 'integer', 'min:0'],
+            'min_duration_minutes' => ['nullable', 'integer', 'min:1'],
+            'max_duration_minutes' => ['nullable', 'integer', 'gte:min_duration_minutes'],
+            'advance_booking_days' => ['nullable', 'integer', 'min:1'],
+            'approval_path' => ['nullable', 'in:none,one_level,two_level'],
+            'cancellation_minutes_before' => ['nullable', 'integer', 'min:0'],
+        ];
 
-        Resource::create($validated);
+        if ($type === 'room') {
+            $rules['capacity'] = ['required', 'integer', 'min:1'];
+            $rules['facilities_text'] = ['nullable', 'string'];
+            $rules['open_time'] = ['nullable', 'date_format:H:i'];
+            $rules['close_time'] = ['nullable', 'date_format:H:i', 'after:open_time'];
+        }
 
-        return back()->with('success', 'Resource created.');
+        if ($type === 'asset') {
+            $rules['code'] = [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('assets', 'code')->ignore($resource?->asset?->id),
+            ];
+            $rules['condition'] = ['nullable', 'in:good,damaged,lost,maintenance'];
+        }
+
+        return $rules;
     }
 
-    public function audit()
+    private function facilitiesFromText(string $text): ?array
     {
-        $logs = AuditLog::with('user')->latest()->paginate(30);
+        $facilities = collect(explode(',', $text))
+            ->map(fn (string $facility) => trim($facility))
+            ->filter()
+            ->values()
+            ->all();
 
-        return view('admin.audit', compact('logs'));
+        return $facilities ?: null;
+    }
+
+    private function ensureCanManageResources(): void
+    {
+        abort_unless(
+            auth()->user()->isAdmin() || auth()->user()->hasRole(Role::RESOURCE_MANAGER->value),
+            403,
+            'Hanya pengelola resource yang bisa mengubah data ini.',
+        );
+    }
+
+    private function ensureAdmin(): void
+    {
+        abort_unless(auth()->user()->isAdmin(), 403, 'Hanya admin yang bisa melakukan aksi ini.');
     }
 }

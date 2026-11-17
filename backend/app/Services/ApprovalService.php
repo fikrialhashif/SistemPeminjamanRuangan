@@ -13,6 +13,7 @@ class ApprovalService
     public function approve(Approval $approval, User $approver, ?string $notes = null): void
     {
         $this->validatePending($approval);
+        $this->validatePreviousLevel($approval);
 
         $approval->update([
             'approver_id' => $approver->id,
@@ -76,6 +77,20 @@ class ApprovalService
     {
         if ($approval->status !== 'pending') {
             throw ValidationException::withMessages(['approval' => 'This approval has already been decided.']);
+        }
+    }
+
+    private function validatePreviousLevel(Approval $approval): void
+    {
+        $hasUnapprovedPreviousLevel = $approval->booking->approvals()
+            ->where('level', '<', $approval->level)
+            ->where('status', '!=', 'approved')
+            ->exists();
+
+        if ($hasUnapprovedPreviousLevel) {
+            throw ValidationException::withMessages([
+                'approval' => 'Setujui tingkat sebelumnya terlebih dahulu.',
+            ]);
         }
     }
 }

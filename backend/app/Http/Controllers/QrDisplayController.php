@@ -16,23 +16,48 @@ class QrDisplayController extends Controller
     {
         $qr = $this->qrTokenService->generate($resource->id);
 
+        $name = e($resource->name);
+        $token = json_encode($qr['token'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+
         $html = <<<HTML
 <!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
 <meta charset="utf-8">
-<title>QR - {$resource->name}</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Check-in {$name}</title>
 <meta http-equiv="refresh" content="25">
-<style>body{display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;font-family:sans-serif;flex-direction:column}#qr{max-width:400px}h2{margin-bottom:0}</style>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap');
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:#f1f5f2;color:#17251e;font-family:'Hanken Grotesk',system-ui,sans-serif;line-height:1.5}
+.kiosk{width:min(480px,100%);overflow:hidden;border:1px solid #b9cbbf;border-radius:8px;background:#fff;box-shadow:0 30px 60px -40px rgba(22,56,43,.55)}
+.kiosk-head{padding:26px 26px 22px;background:#2b5f4a;color:#fff;text-align:center}
+.kiosk-kicker{margin:0;color:#cfe0d7;font-size:12.5px}
+.kiosk-name{margin:5px 0 0;font-family:'Bricolage Grotesque',sans-serif;font-size:clamp(1.5rem,5vw,2rem);font-weight:800;letter-spacing:-.02em;line-height:1.05}
+.kiosk-body{display:flex;flex-direction:column;align-items:center;gap:16px;padding:28px 26px 24px}
+.qr{display:grid;place-items:center;padding:14px;border:1px solid #d3dfd7;border-radius:6px;background:#fff}
+.qr img{display:block;width:min(280px,68vw);height:auto;image-rendering:pixelated}
+.kiosk-hint{max-width:34ch;color:#5d6f65;font-size:14px;text-align:center}
+.kiosk-foot{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 24px;border-top:1px solid #d3dfd7;background:#fbeac9;color:#6b4a08;font-size:12.5px}
+.kiosk-dot{width:7px;height:7px;border-radius:50%;background:#eca017}
+</style>
 </head>
 <body>
-<h2>{$resource->name}</h2>
-<p>Scan to check in</p>
-<div id="qr"></div>
-<p style="font-size:12px;color:#888">Refreshes automatically</p>
+<main class="kiosk">
+<header class="kiosk-head">
+<p class="kiosk-kicker">Scan untuk check-in</p>
+<h1 class="kiosk-name">{$name}</h1>
+</header>
+<div class="kiosk-body">
+<div class="qr" id="qr" aria-label="Kode QR check-in"></div>
+<p class="kiosk-hint">Arahkan kamera aplikasi ke kode ini. QR berlaku singkat dan berganti otomatis.</p>
+</div>
+<footer class="kiosk-foot"><span class="kiosk-dot" aria-hidden="true"></span> Diperbarui otomatis setiap 25 detik</footer>
+</main>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1/qrcode.min.js"></script>
 <script>
-var qr=qrcode(0,'M');qr.addData('{$qr['token']}');qr.make();
+var qr=qrcode(0,'M');qr.addData({$token});qr.make();
 document.getElementById('qr').innerHTML=qr.createImgTag(8,8);
 </script>
 </body>

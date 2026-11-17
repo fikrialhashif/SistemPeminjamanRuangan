@@ -3,11 +3,14 @@
 namespace App\Models;
 
 use App\Enums\ApprovalPath;
+use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ResourceRule extends Model
 {
+    use Auditable;
+
     protected $fillable = [
         'resource_id',
         'buffer_minutes',
