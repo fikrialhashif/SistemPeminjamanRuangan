@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'resource_providers.dart';
@@ -19,7 +20,15 @@ class _ResourcesPageState extends ConsumerState<ResourcesPage> {
       resourceListProvider(ResourceFilter(search: search, type: type)),
     );
     return Scaffold(
-      appBar: AppBar(title: const Text('Resource')),
+      appBar: AppBar(
+        title: const Text('Resource'),
+        actions: [
+          IconButton(
+            onPressed: () => context.push('/bookings'),
+            icon: const Icon(Icons.event_note),
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Padding(
@@ -65,6 +74,10 @@ class _ResourcesPageState extends ConsumerState<ResourcesPage> {
                         return ListTile(
                           title: Text(item['name']?.toString() ?? '-'),
                           subtitle: Text(item['type']?.toString() ?? '-'),
+                          onTap: item['id'] == null
+                              ? null
+                              : () =>
+                                    context.push('/bookings/new/${item['id']}'),
                         );
                       },
                     ),
