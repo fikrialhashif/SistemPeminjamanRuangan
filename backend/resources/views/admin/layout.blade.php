@@ -6,6 +6,7 @@
     <meta name="theme-color" content="#2b5f4a">
     <title>@yield('title', 'Panel admin') | Ruang</title>
     <link rel="stylesheet" href="{{ asset('css/admin.css') }}?v={{ filemtime(public_path('css/admin.css')) }}">
+    @stack('head')
 </head>
 <body>
     @php
@@ -160,6 +161,7 @@
                 var dialog = document.getElementById(button.dataset.openDialog);
                 if (dialog) {
                     dialog.showModal();
+                    dialog.dispatchEvent(new CustomEvent('dialog:open'));
                 }
             });
         });
@@ -223,5 +225,6 @@
             });
         });
     </script>
+    @stack('scripts')
 </body>
 </html>

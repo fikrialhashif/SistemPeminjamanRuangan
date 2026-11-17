@@ -428,22 +428,45 @@ class AdminManagementController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'address' => ['nullable', 'string'],
+            'geofence_type' => ['required', 'in:radius,polygon'],
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
-            'radius' => ['nullable', 'integer', 'min:10'],
+            'radius' => ['required_if:geofence_type,radius', 'nullable', 'integer', 'min:10'],
             'polygon' => ['nullable', 'string'],
         ]);
 
-        $polygon = null;
-        if (! empty($data['polygon'])) {
-            $polygon = json_decode($data['polygon'], true);
-            if (! is_array($polygon)) {
-                throw ValidationException::withMessages(['polygon' => 'Polygon harus berupa JSON array yang valid.']);
-            }
-        }
+        $type = $data['geofence_type'];
+        unset($data['geofence_type']);
 
-        $data['polygon'] = $polygon;
-        $data['radius'] = $data['radius'] ?? 100;
+        if ($type === 'polygon') {
+            $points = json_decode((string) ($data['polygon'] ?? ''), true);
+
+            if (! is_array($points) || count($points) < 3) {
+                throw ValidationException::withMessages([
+                    'polygon' => 'Polygon membutuhkan minimal 3 titik. Klik peta untuk menambahkan titik.',
+                ]);
+            }
+
+            foreach ($points as $index => $point) {
+                $lat = is_array($point) ? ($point['lat'] ?? null) : null;
+                $lng = is_array($point) ? ($point['lng'] ?? null) : null;
+
+                if (! is_numeric($lat) || ! is_numeric($lng)
+                    || $lat < -90 || $lat > 90 || $lng < -180 || $lng > 180) {
+                    throw ValidationException::withMessages([
+                        'polygon' => 'Titik polygon ke-'.($index + 1).' tidak valid.',
+                    ]);
+                }
+            }
+
+            $data['polygon'] = collect($points)
+                ->map(fn (array $point) => ['lat' => (float) $point['lat'], 'lng' => (float) $point['lng']])
+                ->all();
+            $data['radius'] = (int) ($data['radius'] ?? 100);
+        } else {
+            $data['polygon'] = null;
+            $data['radius'] = (int) ($data['radius'] ?? 100);
+        }
 
         return $data;
     }

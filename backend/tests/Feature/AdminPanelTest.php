@@ -239,19 +239,43 @@ class AdminPanelTest extends TestCase
         $admin = $this->userWithRole(RoleEnum::ADMIN);
 
         $this->actingAs($admin)
+            ->get(route('admin.locations'))
+            ->assertOk()
+            ->assertSee('data-location-map', false)
+            ->assertSee('location-map.js', false);
+
+        $this->actingAs($admin)
             ->post(route('admin.locations.store'), [
                 'name' => 'Gedung Baru',
                 'address' => 'Lantai 3',
+                'geofence_type' => 'radius',
                 'latitude' => -6.2,
                 'longitude' => 106.8,
                 'radius' => 150,
-                'polygon' => '[{"lat": -6.2, "lng": 106.8}]',
             ])
             ->assertSessionHasNoErrors();
 
         $location = Location::where('name', 'Gedung Baru')->firstOrFail();
         $this->assertSame(150, $location->radius);
-        $this->assertCount(1, $location->polygon);
+        $this->assertNull($location->polygon);
+
+        $this->actingAs($admin)
+            ->post(route('admin.locations.store'), [
+                'name' => 'Taman Polygon',
+                'geofence_type' => 'polygon',
+                'latitude' => -6.21,
+                'longitude' => 106.81,
+                'polygon' => json_encode([
+                    ['lat' => -6.21, 'lng' => 106.81],
+                    ['lat' => -6.211, 'lng' => 106.811],
+                    ['lat' => -6.212, 'lng' => 106.812],
+                ]),
+            ])
+            ->assertSessionHasNoErrors();
+
+        $polygonLocation = Location::where('name', 'Taman Polygon')->firstOrFail();
+        $this->assertCount(3, $polygonLocation->polygon);
+        $this->assertSame(100, $polygonLocation->radius);
 
         $this->actingAs($admin)
             ->put(route('admin.settings.update'), [

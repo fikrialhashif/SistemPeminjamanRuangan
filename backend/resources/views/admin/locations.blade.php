@@ -2,11 +2,15 @@
 
 @section('title', 'Lokasi & geofence')
 
+@push('head')
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+@endpush
+
 @section('content')
     <header class="plate">
         <div>
             <h1 class="plate-title">Lokasi &amp; geofence</h1>
-            <p class="plate-desc">Atur titik pusat, radius, dan polygon area untuk validasi check-in berbasis GPS.</p>
+            <p class="plate-desc">Pilih radius atau gambar polygon langsung di peta. Bentuk yang dipilih dipakai untuk validasi check-in GPS.</p>
         </div>
         <div class="plate-aside">
             <div class="plate-stat">
@@ -31,8 +35,7 @@
                         <tr>
                             <th scope="col">Lokasi</th>
                             <th scope="col">Koordinat</th>
-                            <th scope="col">Radius</th>
-                            <th scope="col">Polygon</th>
+                            <th scope="col">Geofence</th>
                             <th scope="col">Resource</th>
                             <th scope="col">Aksi</th>
                         </tr>
@@ -47,12 +50,11 @@
                                 <td data-label="Koordinat">
                                     <span class="cell-ip">{{ $location->latitude }}, {{ $location->longitude }}</span>
                                 </td>
-                                <td data-label="Radius"><span class="tag">{{ $location->radius }} m</span></td>
-                                <td data-label="Polygon">
-                                    @if($location->polygon)
-                                        <span class="tag tag--amber">{{ count($location->polygon) }} titik</span>
+                                <td data-label="Geofence">
+                                    @if(is_array($location->polygon) && count($location->polygon) >= 3)
+                                        <span class="tag tag--amber">Polygon {{ count($location->polygon) }} titik</span>
                                     @else
-                                        <span class="cell-muted">Tidak ada</span>
+                                        <span class="tag">Radius {{ $location->radius }} m</span>
                                     @endif
                                 </td>
                                 <td data-label="Resource">{{ $location->resources_count }}</td>
@@ -74,11 +76,11 @@
         @endif
     </section>
 
-    <dialog id="createLocation" class="modal" aria-labelledby="createLocationTitle">
+    <dialog id="createLocation" class="modal modal--map" aria-labelledby="createLocationTitle">
         <div class="modal-head">
             <div>
                 <h2 class="modal-title" id="createLocationTitle">Tambah lokasi</h2>
-                <p class="modal-desc">Radius dipakai untuk validasi GPS. Polygon opsional untuk area yang tidak bundar.</p>
+                <p class="modal-desc">Pilih radius, atau gambar polygon langsung di peta.</p>
             </div>
             <button type="button" class="modal-close" data-close-dialog aria-label="Tutup dialog">&times;</button>
         </div>
@@ -95,11 +97,11 @@
     </dialog>
 
     @foreach($locations as $location)
-        <dialog id="editLocation{{ $location->id }}" class="modal" aria-labelledby="editLocationTitle{{ $location->id }}">
+        <dialog id="editLocation{{ $location->id }}" class="modal modal--map" aria-labelledby="editLocationTitle{{ $location->id }}">
             <div class="modal-head">
                 <div>
                     <h2 class="modal-title" id="editLocationTitle{{ $location->id }}">Edit {{ $location->name }}</h2>
-                    <p class="modal-desc">Perbarui koordinat dan area geofence.</p>
+                    <p class="modal-desc">Perbarui radius atau gambar ulang polygon geofence.</p>
                 </div>
                 <button type="button" class="modal-close" data-close-dialog aria-label="Tutup dialog">&times;</button>
             </div>
@@ -118,3 +120,8 @@
     @endforeach
 
 @endsection
+
+@push('scripts')
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="{{ asset('js/location-map.js') }}?v={{ filemtime(public_path('js/location-map.js')) }}"></script>
+@endpush
