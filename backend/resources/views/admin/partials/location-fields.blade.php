@@ -3,8 +3,8 @@
     $polygon = $location?->polygon;
     $geofenceType = old('geofence_type', is_array($polygon) && count($polygon) >= 3 ? 'polygon' : 'radius');
     $radiusValue = old('radius', $location?->radius ?? 100);
-    $latitudeValue = old('latitude', $location?->latitude ?? -6.2000000);
-    $longitudeValue = old('longitude', $location?->longitude ?? 106.8166660);
+    $latitudeValue = old('latitude', $location?->latitude ?? 0.5201724);
+    $longitudeValue = old('longitude', $location?->longitude ?? 101.4539465);
     $polygonValue = old('polygon', is_array($polygon) ? json_encode($polygon, JSON_UNESCAPED_SLASHES) : '');
 @endphp
 
