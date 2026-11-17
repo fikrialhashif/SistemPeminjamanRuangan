@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../../../core/network/api_error.dart';
 import '../../../core/permissions/app_permissions.dart';
 import '../data/check_in_repository.dart';
 import '../data/location_service.dart';
@@ -9,48 +10,95 @@ import '../data/location_service.dart';
 class CheckInPage extends ConsumerStatefulWidget {
   const CheckInPage({required this.bookingId, super.key});
   final String bookingId;
+
   @override
   ConsumerState<CheckInPage> createState() => _CheckInPageState();
 }
 
 class _CheckInPageState extends ConsumerState<CheckInPage> {
-  final _location = LocationService();
   String? qrToken;
-  LocationEvidence? evidence;
   String? message;
+  bool? accepted;
   bool loading = false;
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(title: const Text('Check-in')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text(qrToken == null ? 'QR belum dipindai' : 'QR berhasil dipindai'),
-          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(
+                qrToken == null
+                    ? Icons.qr_code_scanner
+                    : Icons.check_circle_outline,
+                color: qrToken == null ? null : colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  qrToken == null
+                      ? 'Pindai QR yang ditampilkan di ruangan.'
+                      : 'QR berhasil dipindai.',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           if (qrToken == null)
-            SizedBox(
-              height: 260,
-              child: MobileScanner(
-                onDetect: (capture) {
-                  final value = capture.barcodes.firstOrNull?.rawValue;
-                  if (value != null && mounted) setState(() => qrToken = value);
-                },
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                height: 260,
+                child: MobileScanner(
+                  onDetect: (capture) {
+                    final value = capture.barcodes.firstOrNull?.rawValue;
+                    if (value != null && mounted) {
+                      setState(() => qrToken = value);
+                    }
+                  },
+                ),
               ),
             ),
           const SizedBox(height: 16),
           FilledButton.icon(
             onPressed: loading ? null : _checkIn,
-            icon: const Icon(Icons.location_on),
+            icon: loading
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.location_on),
             label: Text(loading ? 'Memproses...' : 'Ambil lokasi dan check-in'),
           ),
           if (message != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 20),
-              child: Text(
-                message!,
-                style: Theme.of(context).textTheme.bodyLarge,
+            Semantics(
+              liveRegion: true,
+              child: Container(
+                margin: const EdgeInsets.only(top: 20),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: (accepted ?? false)
+                      ? colorScheme.primaryContainer
+                      : colorScheme.errorContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      (accepted ?? false) ? Icons.check_circle : Icons.error,
+                      color: (accepted ?? false)
+                          ? colorScheme.onPrimaryContainer
+                          : colorScheme.onErrorContainer,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text(message!)),
+                  ],
+                ),
               ),
             ),
         ],
@@ -60,27 +108,32 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
 
   Future<void> _checkIn() async {
     if (qrToken == null) {
-      setState(() => message = 'Pindai QR ruangan terlebih dahulu.');
+      setState(() {
+        message = 'Pindai QR ruangan terlebih dahulu.';
+        accepted = false;
+      });
       return;
     }
     setState(() {
       loading = true;
       message = null;
     });
+    final locationService = ref.read(locationServiceProvider);
     try {
-      final permission = await _location.permissionState();
+      final permission = await locationService.permissionState();
       if (permission != PermissionState.granted) {
-        final requested = await _location.requestPermission();
+        final requested = await locationService.requestPermission();
         if (requested != PermissionState.granted) {
-          setState(
-            () => message = requested == PermissionState.permanentlyDenied
-                ? 'Izin lokasi ditolak permanen. Buka pengaturan aplikasi.'
-                : 'Izin lokasi diperlukan untuk check-in.',
-          );
+          setState(() {
+            accepted = false;
+            message = requested == PermissionState.permanentlyDenied
+                ? 'Izin lokasi ditolak permanen. Buka pengaturan aplikasi lalu izinkan lokasi.'
+                : 'Izin lokasi diperlukan untuk check-in.';
+          });
           return;
         }
       }
-      final location = await _location.currentEvidence();
+      final location = await locationService.currentEvidence();
       final result = await ref
           .read(checkInRepositoryProvider)
           .checkIn(
@@ -88,18 +141,18 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
             qrToken: qrToken!,
             location: location,
           );
-      final accepted =
-          result['result'] == 'accepted' || result['status'] == 'accepted';
-      setState(
-        () => message = accepted
-            ? 'Check-in berhasil.'
-            : checkInReasonMessage(
-                result['reason_code']?.toString() ??
-                    result['reason']?.toString(),
-              ),
-      );
+      final state =
+          result['result']?.toString() ?? result['status']?.toString();
+      final isAccepted = state == 'accepted';
+      setState(() {
+        accepted = isAccepted;
+        message = checkInDecisionMessage(result);
+      });
     } catch (error) {
-      setState(() => message = error.toString());
+      setState(() {
+        accepted = false;
+        message = apiErrorMessage(error);
+      });
     } finally {
       if (mounted) setState(() => loading = false);
     }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/api_error.dart';
 import '../data/booking_repository.dart';
 import 'booking_providers.dart';
 
@@ -52,7 +53,7 @@ class _BookingFormPageState extends ConsumerState<BookingFormPage> {
           ),
           availability.when(
             loading: () => const LinearProgressIndicator(),
-            error: (e, _) => Text(e.toString()),
+            error: (e, _) => Text(apiErrorMessage(e)),
             data: (slots) => Text('${slots.length} slot tersedia'),
           ),
           ListTile(
@@ -142,7 +143,7 @@ class _BookingFormPageState extends ConsumerState<BookingFormPage> {
           );
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      if (mounted) setState(() => error = e.toString());
+      if (mounted) setState(() => error = apiErrorMessage(e));
     } finally {
       if (mounted) setState(() => loading = false);
     }

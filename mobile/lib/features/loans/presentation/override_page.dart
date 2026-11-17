@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/api_error.dart';
 import '../data/loan_repository.dart';
 
 class OverridePage extends ConsumerStatefulWidget {
@@ -14,6 +15,12 @@ class _OverridePageState extends ConsumerState<OverridePage> {
   final reason = TextEditingController();
   bool busy = false;
   String? error;
+
+  @override
+  void dispose() {
+    reason.dispose();
+    super.dispose();
+  }
 
   Future<void> submit() async {
     if (reason.text.trim().length < 10) {
@@ -33,7 +40,7 @@ class _OverridePageState extends ConsumerState<OverridePage> {
           );
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      setState(() => error = '$e');
+      setState(() => error = apiErrorMessage(e));
     } finally {
       if (mounted) setState(() => busy = false);
     }

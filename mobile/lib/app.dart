@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'core/session/session_expiry.dart';
 import 'features/auth/presentation/login_page.dart';
 import 'features/bookings/presentation/booking_form_page.dart';
 import 'features/bookings/presentation/bundled_booking_page.dart';
@@ -15,7 +17,7 @@ import 'features/loans/presentation/manager_loans_page.dart';
 import 'features/notifications/presentation/notifications_page.dart';
 import 'features/notifications/presentation/penalties_page.dart';
 
-final _router = GoRouter(
+GoRouter buildAppRouter() => GoRouter(
   routes: [
     GoRoute(path: '/', builder: (context, state) => const LoginPage()),
     GoRoute(
@@ -73,15 +75,28 @@ final _router = GoRouter(
   ],
 );
 
-class BookingApp extends StatelessWidget {
+class BookingApp extends ConsumerStatefulWidget {
   const BookingApp({super.key});
+
   @override
-  Widget build(BuildContext context) => MaterialApp.router(
-    title: 'Smart Room Booking',
-    theme: ThemeData(
-      colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
-      useMaterial3: true,
-    ),
-    routerConfig: _router,
-  );
+  ConsumerState<BookingApp> createState() => _BookingAppState();
+}
+
+class _BookingAppState extends ConsumerState<BookingApp> {
+  late final GoRouter _router = buildAppRouter();
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen<int>(sessionExpiryProvider, (previous, next) {
+      if (next > (previous ?? 0)) _router.go('/');
+    });
+    return MaterialApp.router(
+      title: 'Smart Room Booking',
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
+        useMaterial3: true,
+      ),
+      routerConfig: _router,
+    );
+  }
 }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:go_router/go_router.dart';
 
+import '../../../core/network/api_error.dart';
 import 'auth_controller.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
@@ -29,14 +30,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     final auth = ref.watch(authControllerProvider);
     ref.listen(authControllerProvider, (_, next) {
       if (next.hasError && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              ref.read(authControllerProvider.notifier).errorMessage() ??
-                  'Login gagal.',
-            ),
-          ),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(apiErrorMessage(next.error))));
       } else if (next.hasValue && next.value != null && mounted) {
         context.go('/resources');
       }
@@ -51,6 +46,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             TextFormField(
               controller: _email,
               keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
+              autofillHints: const [AutofillHints.username],
               decoration: const InputDecoration(labelText: 'Email'),
               validator: (value) => value == null || !value.contains('@')
                   ? 'Email tidak valid'
@@ -60,6 +57,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             TextFormField(
               controller: _password,
               obscureText: true,
+              textInputAction: TextInputAction.done,
+              autofillHints: const [AutofillHints.password],
+              onFieldSubmitted: (_) => _submit(),
               decoration: const InputDecoration(labelText: 'Password'),
               validator: (value) => value == null || value.isEmpty
                   ? 'Password wajib diisi'

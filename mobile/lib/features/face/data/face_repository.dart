@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
@@ -71,6 +72,15 @@ class FaceRepository {
     }
   }
 
-  Future<Uint8List> capture(CameraController controller) async =>
-      (await controller.takePicture()).readAsBytes();
+  Future<Uint8List> capture(CameraController controller) async {
+    final file = await controller.takePicture();
+    try {
+      return await file.readAsBytes();
+    } finally {
+      final discarded = File(file.path);
+      if (await discarded.exists()) {
+        await discarded.delete();
+      }
+    }
+  }
 }

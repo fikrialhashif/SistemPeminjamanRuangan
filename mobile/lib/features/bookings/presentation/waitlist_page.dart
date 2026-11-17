@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/api_error.dart';
+
 import '../data/advanced_booking_repository.dart';
 
 class WaitlistPage extends ConsumerStatefulWidget {
@@ -25,7 +27,7 @@ class _WaitlistPageState extends ConsumerState<WaitlistPage> {
           .joinWaitlist(widget.bookingId);
       setState(() => result = 'Berhasil masuk antrean.');
     } catch (e) {
-      setState(() => result = '$e');
+      setState(() => result = apiErrorMessage(e));
     } finally {
       if (mounted) setState(() => busy = false);
     }

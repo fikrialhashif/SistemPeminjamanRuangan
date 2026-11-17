@@ -4,6 +4,8 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/api_error.dart';
+
 import '../data/face_repository.dart';
 
 class FaceEnrollmentPage extends ConsumerStatefulWidget {
@@ -91,7 +93,7 @@ class _FaceEnrollmentPageState extends ConsumerState<FaceEnrollmentPage> {
       await ref.read(faceRepositoryProvider).enroll(frames);
       setState(() => message = 'Enrollment berhasil.');
     } catch (error) {
-      setState(() => message = error.toString());
+      setState(() => message = apiErrorMessage(error));
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -102,7 +104,7 @@ class _FaceEnrollmentPageState extends ConsumerState<FaceEnrollmentPage> {
       await ref.read(faceRepositoryProvider).delete();
       if (mounted) setState(() => message = 'Data wajah dihapus.');
     } catch (error) {
-      if (mounted) setState(() => message = error.toString());
+      if (mounted) setState(() => message = apiErrorMessage(error));
     }
   }
 }

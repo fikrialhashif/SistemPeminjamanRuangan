@@ -16,13 +16,35 @@ class ApiError {
         details: data['details'],
       );
     }
+    if (data is List) {
+      return ApiError(message: 'Request failed.', details: data);
+    }
     return const ApiError(message: 'Request failed.');
   }
+
+  @override
+  String toString() => message;
 }
 
 ApiError mapDioError(Object error) {
-  if (error is DioException && error.response != null) {
-    return ApiError.fromResponse(error.response!);
+  if (error is DioException) {
+    if (error.response != null) return ApiError.fromResponse(error.response!);
+    if (error.type == DioExceptionType.connectionTimeout ||
+        error.type == DioExceptionType.receiveTimeout ||
+        error.type == DioExceptionType.sendTimeout) {
+      return const ApiError(
+        message: 'Koneksi ke server terlalu lama. Coba lagi.',
+      );
+    }
+    if (error.type == DioExceptionType.connectionError) {
+      return const ApiError(
+        message: 'Tidak dapat terhubung ke server. Periksa jaringan Anda.',
+      );
+    }
   }
   return const ApiError(message: 'Network error. Check your connection.');
 }
+
+String apiErrorMessage(Object? error) => error is ApiError
+    ? error.message
+    : (error?.toString() ?? 'Terjadi kesalahan.');

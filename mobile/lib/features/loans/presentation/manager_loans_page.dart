@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/formatting/formatters.dart';
+import '../../../core/network/api_error.dart';
+import '../../../core/widgets/status_views.dart';
 import '../data/loan_repository.dart';
 import 'override_page.dart';
 
@@ -19,22 +22,30 @@ class ManagerLoansPage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Peminjaman aset')),
       body: loans.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: Text('Gagal memuat: $error')),
+        loading: () => const Center(
+          child: CircularProgressIndicator(semanticsLabel: 'Memuat peminjaman'),
+        ),
+        error: (error, _) => ErrorView(
+          error: error,
+          onRetry: () => ref.invalidate(loansProvider),
+        ),
         data: (items) => items.isEmpty
-            ? const Center(child: Text('Belum ada peminjaman.'))
+            ? const EmptyView(
+                message: 'Belum ada peminjaman.',
+                icon: Icons.inventory_2_outlined,
+              )
             : ListView.builder(
                 itemCount: items.length,
                 itemBuilder: (context, index) {
                   final loan = items[index];
                   final id = '${loan['id']}';
-                  final status = '${loan['status'] ?? '-'}';
+                  final status = loan['status']?.toString() ?? '-';
                   final asset = Map<String, dynamic>.from(
                     loan['asset'] as Map? ?? {},
                   );
                   return ListTile(
                     title: Text('${asset['code'] ?? 'Aset'}'),
-                    subtitle: Text('Status: $status'),
+                    subtitle: Text('Status: ${statusLabel(status)}'),
                     trailing: TextButton(
                       onPressed: () => Navigator.of(context).push(
                         MaterialPageRoute(
@@ -125,7 +136,7 @@ class _HandoverPageState extends ConsumerState<HandoverPage> {
           );
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      setState(() => error = '$e');
+      setState(() => error = apiErrorMessage(e));
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -189,7 +200,7 @@ class _ReturnPageState extends ConsumerState<ReturnPage> {
           );
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      setState(() => error = '$e');
+      setState(() => error = apiErrorMessage(e));
     } finally {
       if (mounted) setState(() => busy = false);
     }

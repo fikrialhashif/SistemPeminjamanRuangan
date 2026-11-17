@@ -1,7 +1,12 @@
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/permissions/app_permissions.dart';
+
+final locationServiceProvider = Provider<LocationService>(
+  (ref) => LocationService(),
+);
 
 class LocationEvidence {
   const LocationEvidence({

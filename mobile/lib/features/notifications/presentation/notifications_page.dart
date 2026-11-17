@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/widgets/status_views.dart';
 import '../data/notification_repository.dart';
 
 final notificationsProvider =
@@ -17,10 +18,18 @@ class NotificationsPage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Notifikasi')),
       body: notifications.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: Text('Gagal memuat: $error')),
+        loading: () => const Center(
+          child: CircularProgressIndicator(semanticsLabel: 'Memuat notifikasi'),
+        ),
+        error: (error, _) => ErrorView(
+          error: error,
+          onRetry: () => ref.invalidate(notificationsProvider),
+        ),
         data: (items) => items.isEmpty
-            ? const Center(child: Text('Belum ada notifikasi.'))
+            ? const EmptyView(
+                message: 'Belum ada notifikasi.',
+                icon: Icons.notifications_none,
+              )
             : ListView.builder(
                 itemCount: items.length,
                 itemBuilder: (context, index) {

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/formatting/formatters.dart';
+import '../../../core/widgets/status_views.dart';
 import '../data/notification_repository.dart';
 
 final strikesProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((
@@ -19,10 +21,18 @@ class PenaltiesPage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Status penalti')),
       body: strikes.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: Text('Gagal memuat: $error')),
+        loading: () => const Center(
+          child: CircularProgressIndicator(semanticsLabel: 'Memuat penalti'),
+        ),
+        error: (error, _) => ErrorView(
+          error: error,
+          onRetry: () => ref.invalidate(strikesProvider),
+        ),
         data: (items) => items.isEmpty
-            ? const Center(child: Text('Tidak ada strike aktif.'))
+            ? const EmptyView(
+                message: 'Tidak ada strike aktif.',
+                icon: Icons.verified_user_outlined,
+              )
             : ListView.builder(
                 itemCount: items.length,
                 itemBuilder: (context, index) {
@@ -30,7 +40,11 @@ class PenaltiesPage extends ConsumerWidget {
                   return ListTile(
                     leading: const Icon(Icons.warning_amber),
                     title: Text('${item['reason'] ?? 'Strike'}'),
-                    subtitle: Text('${item['created_at'] ?? ''}'),
+                    subtitle: Text(
+                      formatWibDateTime(
+                        item['created_at'] ?? item['issued_at'],
+                      ),
+                    ),
                   );
                 },
               ),

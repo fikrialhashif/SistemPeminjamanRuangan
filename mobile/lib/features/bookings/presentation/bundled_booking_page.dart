@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/api_error.dart';
+
 import '../data/advanced_booking_repository.dart';
 
 class BundledBookingPage extends ConsumerStatefulWidget {
@@ -38,7 +40,7 @@ class _BundledBookingPageState extends ConsumerState<BundledBookingPage> {
       });
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      setState(() => error = '$e');
+      setState(() => error = apiErrorMessage(e));
     } finally {
       if (mounted) setState(() => busy = false);
     }

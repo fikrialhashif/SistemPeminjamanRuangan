@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/formatting/formatters.dart';
+import '../../../core/network/api_error.dart';
+import '../../../core/widgets/status_views.dart';
 import '../data/approval_repository.dart';
 import 'approval_providers.dart';
 
@@ -14,12 +17,15 @@ class ApprovalsPage extends ConsumerWidget {
       appBar: AppBar(title: const Text('Persetujuan')),
       body: approvals.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => _ErrorView(
+        error: (error, _) => ErrorView(
           error: error,
           onRetry: () => ref.invalidate(pendingApprovalsProvider),
         ),
         data: (items) => items.isEmpty
-            ? const Center(child: Text('Tidak ada permintaan pending'))
+            ? const EmptyView(
+                message: 'Tidak ada permintaan pending.',
+                icon: Icons.approval,
+              )
             : RefreshIndicator(
                 onRefresh: () => ref.refresh(pendingApprovalsProvider.future),
                 child: ListView.builder(
@@ -45,7 +51,8 @@ class _ApprovalTile extends ConsumerWidget {
     return ListTile(
       title: Text(resource?['name']?.toString() ?? 'Booking'),
       subtitle: Text(
-        '${user?['name'] ?? user?['email'] ?? 'Pengguna'}\n${booking?['starts_at'] ?? '-'}',
+        '${user?['name'] ?? user?['email'] ?? 'Pengguna'}\n'
+        '${formatWibDateTime(booking?['starts_at'])}',
       ),
       isThreeLine: true,
       onTap: () => _showDecision(context, ref),
@@ -115,26 +122,10 @@ class _ApprovalTile extends ConsumerWidget {
     } catch (error) {
       if (context.mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(error.toString())));
+            .showSnackBar(SnackBar(content: Text(apiErrorMessage(error))));
       }
     } finally {
       notes.dispose();
     }
   }
-}
-
-class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.error, required this.onRetry});
-  final Object error;
-  final VoidCallback onRetry;
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(error.toString()),
-        TextButton(onPressed: onRetry, child: const Text('Coba lagi')),
-      ],
-    ),
-  );
 }
