@@ -4,16 +4,31 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../config/app_environment.dart';
 import '../storage/token_storage.dart';
 
-final tokenStorageProvider = Provider<TokenStorage>((ref) => const TokenStorage());
+final tokenStorageProvider = Provider<TokenStorage>(
+  (ref) => const TokenStorage(),
+);
 
 final dioProvider = Provider<Dio>((ref) {
-  final dio = Dio(BaseOptions(baseUrl: AppEnvironment.apiBaseUrl, headers: {'Accept': 'application/json'}));
-  dio.interceptors.add(InterceptorsWrapper(
-    onRequest: (options, handler) async {
-      final token = await ref.read(tokenStorageProvider).read();
-      if (token != null) options.headers['Authorization'] = 'Bearer $token';
-      handler.next(options);
-    },
-  ));
+  final dio = Dio(
+    BaseOptions(
+      baseUrl: AppEnvironment.apiBaseUrl,
+      headers: {'Accept': 'application/json'},
+    ),
+  );
+  dio.interceptors.add(
+    InterceptorsWrapper(
+      onRequest: (options, handler) async {
+        final token = await ref.read(tokenStorageProvider).read();
+        if (token != null) options.headers['Authorization'] = 'Bearer $token';
+        handler.next(options);
+      },
+      onError: (error, handler) async {
+        if (error.response?.statusCode == 401) {
+          await ref.read(tokenStorageProvider).clear();
+        }
+        handler.next(error);
+      },
+    ),
+  );
   return dio;
 });
