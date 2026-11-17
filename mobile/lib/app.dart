@@ -8,6 +8,7 @@ import 'features/check_in/presentation/check_in_page.dart';
 import 'features/face/presentation/face_enrollment_page.dart';
 import 'features/approvals/presentation/approvals_page.dart';
 import 'features/resources/presentation/resources_page.dart';
+import 'features/loans/presentation/manager_loans_page.dart';
 
 final _router = GoRouter(
   routes: [
@@ -37,6 +38,10 @@ final _router = GoRouter(
       path: '/bookings/new/:resourceId',
       builder: (context, state) =>
           BookingFormPage(resourceId: state.pathParameters['resourceId']!),
+    ),
+    GoRoute(
+      path: '/manager/loans',
+      builder: (context, state) => const ManagerLoansPage(),
     ),
   ],
 );
