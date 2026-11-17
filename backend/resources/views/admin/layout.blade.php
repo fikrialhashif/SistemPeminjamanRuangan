@@ -23,10 +23,10 @@
     <div class="shell">
         <aside class="rail">
             <a class="brand" href="{{ route('admin.dashboard') }}">
-                <span class="brand-mark" aria-hidden="true">R</span>
+                <img class="brand-logo" src="{{ asset('skkmigasxbsp.png') }}" alt="Logo SKK Migas BSP">
                 <span class="brand-text">
-                    <span class="brand-name">Ruang</span>
-                    <span class="brand-sub">Peminjaman ruangan &amp; aset</span>
+                    <span class="brand-name">Siboru</span>
+                    <span class="brand-sub">Sistem Booking Ruangan</span>
                 </span>
             </a>
 
