@@ -303,14 +303,37 @@ class AdminManagementController extends Controller
             ->orderBy('due_at')
             ->get();
 
+        $queuedEntries = $queuedRoomBookings
+            ->map(fn (Booking $booking) => [
+                'type' => 'Ruangan',
+                'title' => $booking->resource->name ?? 'Ruangan tidak dikenal',
+                'subtitle' => $booking->resource->location->name ?? '—',
+                'user' => $booking->user,
+                'starts_at' => $booking->starts_at,
+                'ends_at' => $booking->ends_at,
+                'status' => $booking->status->value === 'checked_in' ? 'Check-in' : 'Disetujui',
+                'status_tone' => $booking->status->value === 'checked_in' ? 'tag--amber' : 'tag--plain',
+            ])
+            ->concat($queuedLoans->map(fn (AssetLoan $loan) => [
+                'type' => 'Aset',
+                'title' => $loan->asset->resource->name ?? 'Aset tidak dikenal',
+                'subtitle' => $loan->asset->code ?? '—',
+                'user' => $loan->user,
+                'starts_at' => $loan->booking?->starts_at,
+                'ends_at' => $loan->booking?->ends_at,
+                'status' => 'Dipesan',
+                'status_tone' => 'tag--plain',
+            ]))
+            ->sortBy(fn (array $entry) => $entry['starts_at']?->timestamp ?? PHP_INT_MAX)
+            ->values();
+
         $totalRooms = Resource::where('type', 'room')->where('is_active', true)->count();
         $totalAssets = Resource::where('type', 'asset')->where('is_active', true)->count();
 
         return view('admin.bookings', compact(
             'activeRoomBookings',
-            'queuedRoomBookings',
             'activeLoans',
-            'queuedLoans',
+            'queuedEntries',
             'totalRooms',
             'totalAssets',
             'now',
