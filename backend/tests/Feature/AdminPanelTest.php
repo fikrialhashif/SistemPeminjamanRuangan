@@ -217,12 +217,65 @@ class AdminPanelTest extends TestCase
             'admin.settings',
             'admin.users',
             'admin.penalties',
+            'admin.bookings',
             'admin.loans',
             'admin.reports',
             'admin.audit',
         ] as $route) {
             $this->get(route($route))->assertOk();
         }
+    }
+
+    public function test_bookings_page_shows_active_rooms_and_assets(): void
+    {
+        $admin = $this->userWithRole(RoleEnum::ADMIN);
+        $borrower = User::factory()->create(['name' => 'Pemakai Aktif']);
+        $location = $this->location();
+
+        $room = Resource::create([
+            'name' => 'Ruang Aktif',
+            'type' => 'room',
+            'location_id' => $location->id,
+        ]);
+        Booking::create([
+            'user_id' => $borrower->id,
+            'resource_id' => $room->id,
+            'title' => 'Rapat Berjalan',
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addHour(),
+            'status' => 'checked_in',
+        ]);
+
+        $assetResource = Resource::create([
+            'name' => 'Kamera Aktif',
+            'type' => 'asset',
+            'location_id' => $location->id,
+        ]);
+        $asset = $assetResource->asset()->create(['code' => 'CAM-ACT', 'condition' => 'good']);
+        $assetBooking = Booking::create([
+            'user_id' => $borrower->id,
+            'resource_id' => $assetResource->id,
+            'title' => 'Pinjam Berjalan',
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addHour(),
+            'status' => 'checked_in',
+        ]);
+        AssetLoan::create([
+            'booking_id' => $assetBooking->id,
+            'asset_id' => $asset->id,
+            'user_id' => $borrower->id,
+            'status' => 'in_use',
+            'handed_over_at' => now()->subHour(),
+            'due_at' => now()->addHour(),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.bookings'))
+            ->assertOk()
+            ->assertSee('Ruangan sedang dipakai')
+            ->assertSee('Ruang Aktif')
+            ->assertSee('Kamera Aktif')
+            ->assertSee('Pemakai Aktif');
     }
 
     public function test_non_admin_cannot_access_management_pages(): void
@@ -232,6 +285,7 @@ class AdminPanelTest extends TestCase
         $this->actingAs($manager)->get(route('admin.settings'))->assertForbidden();
         $this->actingAs($manager)->get(route('admin.users'))->assertForbidden();
         $this->actingAs($manager)->get(route('admin.loans'))->assertOk();
+        $this->actingAs($manager)->get(route('admin.bookings'))->assertOk();
     }
 
     public function test_admin_can_manage_locations_settings_and_users(): void

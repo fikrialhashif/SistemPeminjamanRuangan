@@ -58,6 +58,13 @@
                         </svg>
                         <span>Ruangan &amp; aset</span>
                     </a>
+                    <a href="{{ route('admin.bookings') }}" class="nav-link" @if(request()->routeIs('admin.bookings')) aria-current="page" @endif>
+                        <svg class="nav-glyph" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <circle cx="10" cy="10" r="7"></circle>
+                            <path d="M10 6v4l2.5 1.5"></path>
+                        </svg>
+                        <span>Booking</span>
+                    </a>
                     <a href="{{ route('admin.loans') }}" class="nav-link" @if(request()->routeIs('admin.loans')) aria-current="page" @endif>
                         <svg class="nav-glyph" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M4 6.5h12v10H4z"></path>

@@ -13,6 +13,7 @@ use App\Models\ConditionReport;
 use App\Models\Department;
 use App\Models\LoanEvent;
 use App\Models\Location;
+use App\Models\Resource;
 use App\Models\Role;
 use App\Models\Setting;
 use App\Models\Strike;
@@ -265,6 +266,55 @@ class AdminManagementController extends Controller
         $suspension->update(['ends_at' => now()]);
 
         return back()->with('success', 'Suspensi diakhiri.');
+    }
+
+    public function bookings()
+    {
+        $this->ensureCanManageLoans();
+
+        $now = now();
+        $todayStart = $now->copy()->startOfDay();
+        $todayEnd = $now->copy()->endOfDay();
+
+        $activeRoomBookings = Booking::with(['user.department', 'resource.location'])
+            ->whereHas('resource', fn ($query) => $query->where('type', 'room'))
+            ->whereIn('status', [BookingStatus::APPROVED->value, BookingStatus::CHECKED_IN->value])
+            ->where('starts_at', '<=', $now)
+            ->where('ends_at', '>=', $now)
+            ->orderBy('ends_at')
+            ->get();
+
+        $queuedRoomBookings = Booking::with(['user.department', 'resource.location'])
+            ->whereHas('resource', fn ($query) => $query->where('type', 'room'))
+            ->whereIn('status', [BookingStatus::APPROVED->value, BookingStatus::CHECKED_IN->value])
+            ->where('starts_at', '>', $now)
+            ->whereBetween('starts_at', [$todayStart, $todayEnd])
+            ->orderBy('starts_at')
+            ->get();
+
+        $activeLoans = AssetLoan::with(['asset.resource.location', 'booking', 'user.department'])
+            ->whereIn('status', [LoanStatus::HANDED_OVER->value, LoanStatus::IN_USE->value])
+            ->orderBy('due_at')
+            ->get();
+
+        $queuedLoans = AssetLoan::with(['asset.resource.location', 'booking', 'user.department'])
+            ->where('status', LoanStatus::RESERVED->value)
+            ->whereHas('booking', fn ($query) => $query->whereBetween('starts_at', [$todayStart, $todayEnd]))
+            ->orderBy('due_at')
+            ->get();
+
+        $totalRooms = Resource::where('type', 'room')->where('is_active', true)->count();
+        $totalAssets = Resource::where('type', 'asset')->where('is_active', true)->count();
+
+        return view('admin.bookings', compact(
+            'activeRoomBookings',
+            'queuedRoomBookings',
+            'activeLoans',
+            'queuedLoans',
+            'totalRooms',
+            'totalAssets',
+            'now',
+        ));
     }
 
     public function loans(Request $request)
