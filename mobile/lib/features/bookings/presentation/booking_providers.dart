@@ -11,6 +11,10 @@ final availabilityProvider =
 final bookingsProvider = FutureProvider<List<Map<String, dynamic>>>(
   (ref) => ref.read(bookingRepositoryProvider).list(),
 );
+final bookingDetailProvider =
+    FutureProvider.family<Map<String, dynamic>, String>(
+      (ref, id) => ref.read(bookingRepositoryProvider).show(id),
+    );
 
 class AvailabilityQuery {
   const AvailabilityQuery(this.resourceId, this.date);

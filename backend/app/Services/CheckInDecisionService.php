@@ -4,10 +4,14 @@ namespace App\Services;
 
 use App\Enums\BookingStatus;
 use App\Enums\CheckInResult;
+use App\Enums\ResourceType;
 use App\Models\Booking;
 use App\Models\CheckInAttempt;
 use App\Models\Setting;
 use App\Models\User;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
 
 class CheckInDecisionService
@@ -56,27 +60,60 @@ class CheckInDecisionService
         $faceValid = true;
         $faceScore = null;
         $livenessPassed = null;
-        $faceEnabled = Setting::get('face_verification_enabled', false);
+        $faceEnabled = $booking->resource->type === ResourceType::ROOM
+            || Setting::get('face_verification_enabled', true);
 
         if ($faceEnabled) {
             $faceImage = $evidence['face_image'] ?? null;
+            $challenge = $evidence['face_challenge'] ?? null;
             $challengeResponse = $evidence['face_challenge_response'] ?? null;
+
+            $expectedChallenge = Cache::pull("face_challenge:{$user->id}");
 
             if (! $faceImage) {
                 $faceValid = false;
                 $rejectionReasons[] = 'face: image not provided';
+            } elseif (! $expectedChallenge) {
+                $faceValid = false;
+                $rejectionReasons[] = 'face: challenge missing';
+            } elseif ($challenge !== null && $challenge !== $expectedChallenge) {
+                $faceValid = false;
+                $rejectionReasons[] = 'face: challenge mismatch';
+            } elseif (! $user->faceEnrollment || $user->faceEnrollment->status !== 'enrolled') {
+                $faceValid = false;
+                $rejectionReasons[] = 'face: user not enrolled';
             } else {
-                $faceResult = $this->faceVerificationService->verify($user, $faceImage, $challengeResponse);
-                $faceScore = $faceResult['score'] ?? null;
-                $livenessPassed = $faceResult['liveness_passed'] ?? null;
+                try {
+                    $faceResult = $this->faceVerificationService->verify(
+                        $user,
+                        $faceImage,
+                        $expectedChallenge,
+                        $challengeResponse,
+                    );
+                    $faceScore = $faceResult['score'] ?? null;
+                    $livenessPassed = $faceResult['liveness_passed'] ?? null;
 
-                if (($faceResult['match'] ?? false) === false) {
-                    $faceValid = false;
-                    $rejectionReasons[] = 'face: verification failed';
-                }
+                    if (($faceResult['match'] ?? false) === false) {
+                        $faceValid = false;
+                        $rejectionReasons[] = $livenessPassed === false
+                            ? 'face: liveness check failed'
+                            : 'face: verification failed';
+                    }
 
-                if ($faceResult['inconclusive'] ?? false) {
+                    if ($faceResult['inconclusive'] ?? false) {
+                        $faceValid = null;
+                    }
+                } catch (RequestException $error) {
+                    if ($error->response?->status() === 404) {
+                        $faceValid = false;
+                        $rejectionReasons[] = 'face: user not enrolled';
+                    } else {
+                        $faceValid = null;
+                        $rejectionReasons[] = 'face: service unavailable';
+                    }
+                } catch (ConnectionException) {
                     $faceValid = null;
+                    $rejectionReasons[] = 'face: service unavailable';
                 }
             }
         }
@@ -117,7 +154,11 @@ class CheckInDecisionService
         }
 
         if ($booking->status !== BookingStatus::APPROVED) {
-            throw ValidationException::withMessages(['status' => 'Booking is not in a check-in-able state.']);
+            $message = $booking->status === BookingStatus::PENDING
+                ? 'Booking belum disetujui oleh approver.'
+                : 'Booking is not in a check-in-able state.';
+
+            throw ValidationException::withMessages(['status' => $message]);
         }
     }
 

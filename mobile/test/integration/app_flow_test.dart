@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -77,22 +78,28 @@ void main() {
     expect(checkInBody['gps_is_mock'], false);
     expect(checkInBody.containsKey('gps_timestamp'), isTrue);
 
+    final faceStatus = await container.read(faceRepositoryProvider).status();
+    expect(faceStatus['enrolled'], true);
+    expect(faceStatus['enabled'], true);
+
+    final challenge = await container.read(faceRepositoryProvider).challenge();
+    expect(challenge['challenge_type'], 'turn');
+
     final faceAttempt = await container
-        .read(faceRepositoryProvider)
-        .verify(
+        .read(checkInRepositoryProvider)
+        .checkIn(
           bookingId: '9',
           qrToken: 'signed-qr-token',
-          location: location.toJson(),
-          frame: Uint8List.fromList([1, 2, 3]),
-          challenge: {'blink': true, 'turn': 'left'},
+          location: location,
+          faceImageBase64: base64Encode(Uint8List.fromList([1, 2, 3])),
+          faceChallenge: challenge['challenge_type'] as String,
+          faceChallengeResponse: {'action': challenge['challenge_type']},
         );
     expect(faceAttempt['result'], 'accepted');
     final faceBody = backend.lastJsonBody('/bookings/9/check-in')!;
     expect(faceBody['face_image'], isNotNull);
-    expect(faceBody['face_challenge_response'], {
-      'blink': true,
-      'turn': 'left',
-    });
+    expect(faceBody['face_challenge'], 'turn');
+    expect(faceBody['face_challenge_response'], {'action': 'turn'});
 
     expect(storage.token, 'test-token');
   });

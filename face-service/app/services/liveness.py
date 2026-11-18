@@ -5,9 +5,7 @@ from app.config import settings
 
 class LivenessChecker:
     INSTRUCTIONS = {
-        "blink": "Please blink your eyes",
-        "turn_left": "Please turn your head to the left",
-        "turn_right": "Please turn your head to the right",
+        "turn": "Tolehkan kepala ke kiri atau kanan",
     }
 
     def get_challenge(self) -> dict:
@@ -17,12 +15,18 @@ class LivenessChecker:
             "instruction": self.INSTRUCTIONS.get(challenge_type, "Perform the action"),
         }
 
-    def verify_challenge(self, challenge_type: str, response: dict) -> bool:
+    def verify_challenge(
+        self,
+        challenge_type: str,
+        response: dict | None,
+        current_yaw: float | None,
+        baseline_yaw: float | None,
+    ) -> bool:
         if challenge_type not in settings.LIVENESS_CHALLENGES:
             return False
-        if not response or "action" not in response:
+        if current_yaw is None or baseline_yaw is None:
             return False
-        return response.get("action") == challenge_type
+        return abs(current_yaw - baseline_yaw) >= settings.MIN_TURN_DEGREES
 
 
 liveness_checker = LivenessChecker()

@@ -1,15 +1,21 @@
 from pydantic_settings import BaseSettings
-from cryptography.fernet import Fernet
 
 
 class Settings(BaseSettings):
     FACE_SERVICE_SECRET: str
-    EMBEDDING_ENCRYPTION_KEY: str = Fernet.generate_key().decode()
+    EMBEDDING_ENCRYPTION_KEY: str = "change-me-in-production"
+    EMBEDDING_STORE_DIR: str = "./data/embeddings"
+    MODEL_NAME: str = "buffalo_s"
     MATCH_THRESHOLD: float = 0.6
     MIN_FACE_SIZE: int = 80
+    MIN_DETECTION_SCORE: float = 0.5
+    MAX_YAW_DEGREES: float = 45.0
+    MAX_TURN_YAW_DEGREES: float = 75.0
+    MIN_TURN_DEGREES: float = 18.0
+    MIN_BLUR_VARIANCE: float = 30.0
     MIN_SAMPLES: int = 3
     MAX_SAMPLES: int = 5
-    LIVENESS_CHALLENGES: list = ["blink", "turn_left", "turn_right"]
+    LIVENESS_CHALLENGES: list = ["turn"]
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

@@ -17,6 +17,8 @@ class FaceEnrollRequest extends FormRequest
             'consent' => ['required', 'accepted'],
             'images' => ['required', 'array', 'min:3'],
             'images.*' => ['required', 'string'],
+            'poses' => ['sometimes', 'array', 'size:3'],
+            'poses.*' => ['required', 'string', 'in:front,turn_left,turn_right'],
         ];
     }
 }

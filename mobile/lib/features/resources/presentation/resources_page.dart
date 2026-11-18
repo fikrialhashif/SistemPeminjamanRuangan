@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/network/api_error.dart';
 import '../../../core/widgets/status_views.dart';
 import '../../auth/presentation/auth_controller.dart';
+import '../../face/data/face_providers.dart';
+import '../../face/data/face_repository.dart';
 import 'resource_providers.dart';
 
 class ResourcesPage extends ConsumerStatefulWidget {
@@ -22,6 +25,7 @@ class _ResourcesPageState extends ConsumerState<ResourcesPage> {
     final resources = ref.watch(
       resourceListProvider(ResourceFilter(search: search, type: type)),
     );
+    final faceStatus = ref.watch(faceStatusProvider);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Resource'),
@@ -52,6 +56,32 @@ class _ResourcesPageState extends ConsumerState<ResourcesPage> {
       ),
       body: Column(
         children: [
+          faceStatus.maybeWhen(
+            data: (status) {
+              final needsFace =
+                  status['enabled'] == true && status['enrolled'] != true;
+              if (!needsFace) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: Material(
+                  color: Theme.of(context).colorScheme.secondaryContainer,
+                  borderRadius: BorderRadius.circular(16),
+                  child: ListTile(
+                    leading: const Icon(Icons.face_retouching_natural),
+                    title: const Text('Daftarkan wajah dulu'),
+                    subtitle: const Text(
+                      'Wajah wajib terdaftar sebelum membuat booking ruangan.',
+                    ),
+                    trailing: FilledButton(
+                      onPressed: _openEnrollment,
+                      child: const Text('Daftar'),
+                    ),
+                  ),
+                ),
+              );
+            },
+            orElse: () => const SizedBox.shrink(),
+          ),
           Padding(
             padding: const EdgeInsets.all(16),
             child: Semantics(
@@ -130,7 +160,9 @@ class _ResourcesPageState extends ConsumerState<ResourcesPage> {
                           trailing: const Icon(Icons.chevron_right),
                           onTap: id == null
                               ? null
-                              : () => context.push('/bookings/new/$id'),
+                              : () => isRoom
+                                    ? _openBooking(id)
+                                    : context.push('/bookings/new/$id'),
                         );
                       },
                     ),
@@ -141,10 +173,58 @@ class _ResourcesPageState extends ConsumerState<ResourcesPage> {
     );
   }
 
+  Future<bool> _openEnrollment() async {
+    final result = await context.push<bool>('/face/enrollment');
+    ref.invalidate(faceStatusProvider);
+    return result == true;
+  }
+
+  Future<void> _openBooking(String id) async {
+    if (!await _ensureFaceEnrolled()) return;
+    if (mounted) context.push('/bookings/new/$id');
+  }
+
+  Future<bool> _ensureFaceEnrolled() async {
+    try {
+      final status = await ref.read(faceRepositoryProvider).status();
+      ref.invalidate(faceStatusProvider);
+      if (status['enabled'] != true || status['enrolled'] == true) return true;
+      if (!mounted) return false;
+
+      final enroll = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          icon: const Icon(Icons.face_retouching_natural),
+          title: const Text('Daftarkan wajah terlebih dahulu'),
+          content: const Text(
+            'Wajah wajib terdaftar sebelum membuat booking ruangan. Daftarkan wajah sekarang?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Nanti'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Daftar wajah'),
+            ),
+          ],
+        ),
+      );
+      if (enroll == true) return await _openEnrollment();
+      return false;
+    } catch (error) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(apiErrorMessage(error))));
+      return true;
+    }
+  }
+
   Future<void> _onMenu(String value) async {
     switch (value) {
       case 'face':
-        await context.push('/face/enrollment');
+        await _openEnrollment();
       case 'notifications':
         await context.push('/notifications');
       case 'penalties':

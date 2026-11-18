@@ -94,12 +94,18 @@ services:
       - "8001:8001"
     environment:
       FACE_SERVICE_SECRET: change-me-in-production
-      EMBEDDING_ENCRYPTION_KEY: placeholder-key
+      EMBEDDING_ENCRYPTION_KEY: change-me-in-production
+      EMBEDDING_STORE_DIR: /data/embeddings
+      MODEL_NAME: buffalo_s
+    volumes:
+      - face_data:/data
+      - face_models:/root/.insightface
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 12
+      start_period: 180s
 
   mailpit:
     image: axllent/mailpit
@@ -109,3 +115,5 @@ services:
 
 volumes:
   mysql_data:
+  face_data:
+  face_models:

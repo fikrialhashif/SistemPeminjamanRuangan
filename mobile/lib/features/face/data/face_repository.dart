@@ -26,11 +26,27 @@ class FaceRepository {
     }
   }
 
-  Future<Map<String, dynamic>> enroll(List<Uint8List> frames) async {
+  Future<Map<String, dynamic>> challenge() async {
+    try {
+      final response = await _dio.get('/face/challenge');
+      return Map<String, dynamic>.from(response.data as Map);
+    } catch (error) {
+      throw mapDioError(error);
+    }
+  }
+
+  Future<Map<String, dynamic>> enroll(
+    List<Uint8List> frames,
+    List<String> poses,
+  ) async {
     try {
       final response = await _dio.post(
         '/face/enroll',
-        data: {'consent': true, 'images': frames.map(base64Encode).toList()},
+        data: {
+          'consent': true,
+          'images': frames.map(base64Encode).toList(),
+          'poses': poses,
+        },
       );
       return Map<String, dynamic>.from(response.data as Map);
     } catch (error) {
@@ -41,32 +57,6 @@ class FaceRepository {
   Future<void> delete() async {
     try {
       await _dio.delete('/face');
-    } catch (error) {
-      throw mapDioError(error);
-    }
-  }
-
-  Future<Map<String, dynamic>> verify({
-    required String bookingId,
-    required String qrToken,
-    required Map<String, Object> location,
-    required Uint8List frame,
-    Map<String, dynamic>? challenge,
-  }) async {
-    try {
-      final data = <String, dynamic>{
-        'qr_token': qrToken,
-        ...location,
-        'face_image': base64Encode(frame),
-      };
-      if (challenge != null) {
-        data['face_challenge_response'] = challenge;
-      }
-      final response = await _dio.post(
-        '/bookings/$bookingId/check-in',
-        data: data,
-      );
-      return Map<String, dynamic>.from(response.data as Map);
     } catch (error) {
       throw mapDioError(error);
     }
@@ -84,3 +74,12 @@ class FaceRepository {
     }
   }
 }
+
+String faceChallengeInstruction(String? challengeType) =>
+    switch (challengeType) {
+      'turn' => 'Tolehkan kepala ke kiri atau kanan',
+      'blink' => 'Kedipkan mata Anda',
+      'turn_left' => 'Tengokkan kepala ke kiri',
+      'turn_right' => 'Tengokkan kepala ke kanan',
+      _ => 'Lakukan gerakan yang diminta',
+    };

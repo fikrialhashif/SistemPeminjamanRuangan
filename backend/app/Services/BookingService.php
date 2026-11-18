@@ -4,7 +4,9 @@ namespace App\Services;
 
 use App\Enums\ApprovalPath;
 use App\Enums\BookingStatus;
+use App\Enums\ResourceType;
 use App\Exceptions\ConflictException;
+use App\Exceptions\FaceEnrollmentRequiredException;
 use App\Models\Approval;
 use App\Models\Booking;
 use App\Models\Resource;
@@ -25,6 +27,7 @@ class BookingService
 
         $this->validateResourceActive($resource);
         $this->validateUserAccess($user, $resource);
+        $this->validateFaceEnrollment($user, $resource);
         $this->validateDuration($resource, $data);
 
         $attempt = 0;
@@ -56,9 +59,10 @@ class BookingService
                     }
 
                     $approvalPath = $resource->rules?->approval_path ?? ApprovalPath::NONE;
-                    $status = $approvalPath === ApprovalPath::NONE
-                        ? BookingStatus::APPROVED
-                        : BookingStatus::PENDING;
+                    $effectiveApprovalPath = $approvalPath === ApprovalPath::NONE
+                        ? ApprovalPath::ONE_LEVEL
+                        : $approvalPath;
+                    $status = BookingStatus::PENDING;
 
                     $booking = Booking::create([
                         'user_id' => $user->id,
@@ -71,9 +75,7 @@ class BookingService
                         'notes' => $data['notes'] ?? null,
                     ]);
 
-                    if ($approvalPath !== ApprovalPath::NONE) {
-                        $this->createApprovals($booking, $approvalPath);
-                    }
+                    $this->createApprovals($booking, $effectiveApprovalPath);
 
                     return $booking;
                 });
@@ -195,6 +197,21 @@ class BookingService
 
         if (! $hasAccess) {
             throw ValidationException::withMessages(['access' => 'You do not have access to this resource.']);
+        }
+    }
+
+    private function validateFaceEnrollment(User $user, Resource $resource): void
+    {
+        if ($resource->type !== ResourceType::ROOM) {
+            return;
+        }
+
+        if (! Setting::get('face_verification_enabled', false)) {
+            return;
+        }
+
+        if ($user->faceEnrollment?->status !== 'enrolled') {
+            throw new FaceEnrollmentRequiredException;
         }
     }
 

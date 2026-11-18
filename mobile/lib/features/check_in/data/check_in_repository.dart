@@ -17,11 +17,20 @@ class CheckInRepository {
     required String bookingId,
     required String qrToken,
     required LocationEvidence location,
+    String? faceImageBase64,
+    String? faceChallenge,
+    Map<String, dynamic>? faceChallengeResponse,
   }) async {
     try {
       final response = await _dio.post(
         '/bookings/$bookingId/check-in',
-        data: {'qr_token': qrToken, ...location.toJson()},
+        data: {
+          'qr_token': qrToken,
+          ...location.toJson(),
+          'face_image': ?faceImageBase64,
+          'face_challenge': ?faceChallenge,
+          'face_challenge_response': ?faceChallengeResponse,
+        },
       );
       return Map<String, dynamic>.from(response.data as Map);
     } catch (error) {
@@ -40,6 +49,10 @@ String checkInReasonMessage(String? code) =>
       'invalid_qr': 'QR tidak valid atau sudah kedaluwarsa.',
       'wrong_room': 'QR bukan untuk ruangan booking ini.',
       'outside_window': 'Belum masuk waktu check-in.',
+      'face_not_enrolled':
+          'Wajah belum terdaftar. Daftarkan wajah terlebih dahulu.',
+      'face_liveness_failed':
+          'Verifikasi liveness gagal. Ulangi gerakan yang diminta.',
     }[code] ??
     'Check-in ditolak. Ikuti petunjuk lalu coba lagi.';
 
@@ -96,6 +109,15 @@ String _reasonFromServer(String reason) {
   if (value.contains('face')) {
     if (value.contains('not provided')) {
       return 'Wajah belum terdeteksi. Ulangi verifikasi wajah.';
+    }
+    if (value.contains('not enrolled')) {
+      return 'Wajah belum terdaftar. Daftarkan wajah terlebih dahulu.';
+    }
+    if (value.contains('liveness')) {
+      return 'Liveness gagal. Ulangi gerakan yang diminta.';
+    }
+    if (value.contains('unavailable')) {
+      return 'Layanan wajah sedang tidak tersedia. Verifikasi manual diperlukan.';
     }
     return 'Verifikasi wajah gagal. Posisikan wajah di dalam bingkai.';
   }

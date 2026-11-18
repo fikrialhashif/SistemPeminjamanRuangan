@@ -32,7 +32,7 @@ flutter build apk --release --dart-define=API_BASE_URL=https://<host>/api/v1
 ## Tests
 
 - `test/support/fake_backend.dart` provides a Dio `HttpClientAdapter` and fake token storage. Override only `tokenStorageProvider`; read `dioProvider` from the container and set `httpClientAdapter` so auth/401 interceptors keep running.
-- Integration flow: `test/integration/app_flow_test.dart` (login -> catalog -> booking -> check-in with QR/GPS/face evidence).
+- Integration flow: `test/integration/app_flow_test.dart` (login -> catalog -> booking -> 3-step check-in with location, QR, and server-issued face challenge evidence).
 - Widget/unit tests cover login navigation, API error mapping, and check-in reason mapping.
 
 ## Docs

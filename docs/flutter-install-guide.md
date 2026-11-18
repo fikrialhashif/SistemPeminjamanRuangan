@@ -17,8 +17,24 @@ flutter build apk --release --dart-define=API_BASE_URL=https://staging.example.c
 ```
 
 - Tanpa `--dart-define`, aplikasi memakai `http://10.0.2.2:8000/api/v1` (emulator Android ke backend lokal).
+- Untuk perangkat fisik lewat USB: `adb reverse tcp:8000 tcp:8000` lalu build dengan `--dart-define=API_BASE_URL=http://127.0.0.1:8000/api/v1`. Tanpa kabel, pakai IP LAN komputer, mis. `--dart-define=API_BASE_URL=http://192.168.1.32:8000/api/v1` (perangkat harus satu jaringan dan firewall mengizinkan port 8000).
 - Build rilis memblokir HTTP cleartext (default Android untuk targetSdk modern). Gunakan HTTPS untuk staging.
 - Jangan commit `.env`, `key.properties`, atau keystore.
+
+### Menjalankan face-service lokal
+
+Pendaftaran dan verifikasi wajah membutuhkan face-service di port 8001. Jika Docker tidak tersedia, jalankan dengan Python 3.13:
+
+```text
+cd face-service
+py -3.13 -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+.venv\Scripts\python.exe -m pip install <wheel InsightFace cp313>
+.venv\Scripts\python.exe -m app.warmup
+.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8001
+```
+
+`app.warmup` mengunduh model `buffalo_s` ke `~/.insightface/models/buffalo_s`. Pastikan `FACE_SERVICE_SECRET` di `face-service/.env` sama dengan konfigurasi backend.
 
 ## 3. Penandatanganan rilis (milik owner)
 
@@ -62,11 +78,12 @@ flutter build appbundle --release --dart-define=API_BASE_URL=https://staging.exa
 
 1. Login dengan akun uji dari seeder backend.
 2. Buka katalog resource, cari dan filter.
-3. Buat booking; pastikan konflik tampil sebagai pesan, bukan crash.
-4. Buka "Booking saya", lakukan check-in (QR ruangan + izin lokasi). Wajah hanya aktif jika `face_verification_enabled` di backend menyala.
-5. Buka menu: notifikasi, status penalti, daftar wajah, peminjaman aset (akun manager).
-6. Putuskan jaringan saat membuka daftar; pastikan muncul pesan dan tombol "Coba lagi".
-7. Uji izin: tolak lokasi/kamera, lalu izinkan lewat pengaturan aplikasi.
+3. Daftarkan wajah lewat menu/resources: ikuti instruksi tiga sampel (toleh kiri, toleh kanan, lalu hadap lurus). Pastikan wajah tampil normal tidak gepeng, gerakan toleh terlihat jelas, dan status berubah menjadi terdaftar. Jika data wajah lama ditolak saat check-in, daftar ulang agar baseline arah kepala tersimpan.
+4. Coba buat booking ruangan sebelum pendaftaran: harus muncul pesan `face_enrollment_required` dan tombol untuk mendaftar. Setelah terdaftar, buat booking; pastikan konflik tampil sebagai pesan, bukan crash. Booking aset tetap bisa dibuat tanpa wajah.
+5. Buka "Booking saya", lakukan konfirmasi 3 tahap: izin lokasi, pindai QR ruangan, lalu verifikasi wajah. Wajah yang tidak cocok harus ditolak server. Wajah hanya aktif jika `face_verification_enabled` di backend menyala.
+6. Buka menu: notifikasi, status penalti, daftar wajah, peminjaman aset (akun manager).
+7. Putuskan jaringan saat membuka daftar; pastikan muncul pesan dan tombol "Coba lagi".
+8. Uji izin: tolak lokasi/kamera, lalu izinkan lewat pengaturan aplikasi.
 
 ## 6. Batasan yang diketahui
 

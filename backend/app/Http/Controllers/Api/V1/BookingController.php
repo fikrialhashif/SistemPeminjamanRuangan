@@ -7,15 +7,15 @@ use App\Http\Requests\CheckInRequest;
 use App\Http\Requests\StoreBookingRequest;
 use App\Http\Requests\StoreBundledBookingRequest;
 use App\Http\Requests\StoreRecurringBookingRequest;
-use App\Models\BookingSeries;
-use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
 use App\Models\Booking;
+use App\Models\BookingSeries;
 use App\Models\WaitlistEntry;
 use App\Services\BookingService;
 use App\Services\CheckInDecisionService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class BookingController extends Controller
 {
@@ -27,7 +27,7 @@ class BookingController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
-        $query = Booking::with(['resource', 'user']);
+        $query = Booking::with(['resource.location', 'user']);
 
         if (! $user->isAdmin()) {
             $query->where('user_id', $user->id);
@@ -51,7 +51,7 @@ class BookingController extends Controller
 
     public function show(Booking $booking): JsonResponse
     {
-        return response()->json($booking->load(['resource', 'user', 'approvals', 'checkInAttempts']));
+        return response()->json($booking->load(['resource.location', 'user', 'approvals', 'checkInAttempts']));
     }
 
     public function destroy(Request $request, Booking $booking): JsonResponse
@@ -92,7 +92,7 @@ class BookingController extends Controller
         $start = Carbon::parse($data['starts_at']);
         $end = Carbon::parse($data['ends_at']);
         $duration = $start->diffInSeconds($end);
-        $series = DB::transaction(function () use ($request, $data, $start, $end, $duration, $interval) {
+        $series = DB::transaction(function () use ($request, $data, $start, $duration, $interval) {
             $series = BookingSeries::create([
                 'user_id' => $request->user()->id,
                 'resource_id' => $data['resource_id'],
@@ -116,8 +116,10 @@ class BookingController extends Controller
                     }
                 }
             }
+
             return $series->load('bookings');
         });
+
         return response()->json($series, 201);
     }
 
@@ -127,6 +129,7 @@ class BookingController extends Controller
             return response()->json(['message' => 'Waitlist offer is not claimable.'], 422);
         }
         $waitlistEntry->update(['status' => 'claimed', 'claimed_at' => now()]);
+
         return response()->json($waitlistEntry);
     }
 
@@ -136,6 +139,7 @@ class BookingController extends Controller
             return response()->json(['message' => 'Waitlist offer cannot be declined.'], 422);
         }
         $waitlistEntry->update(['status' => 'declined']);
+
         return response()->json($waitlistEntry);
     }
 

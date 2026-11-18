@@ -117,6 +117,12 @@ class DatabaseSeeder extends Seeder
         ]);
 
         Setting::set('check_in_window_minutes', 15, 'integer');
+        Setting::set('checkin_window_before_minutes', 15, 'integer');
+        Setting::set('checkin_window_after_minutes', 15, 'integer');
+        Setting::set('checkin_failure_strike_threshold', 3, 'integer');
+        Setting::set('face_verification_enabled', true, 'boolean');
+        Setting::set('gps_accuracy_threshold_meters', 50, 'integer');
+        Setting::set('gps_freshness_seconds', 30, 'integer');
         Setting::set('strike_window_days', 30, 'integer');
         Setting::set('strike_threshold', 3, 'integer');
         Setting::set('suspension_duration_days', 7, 'integer');

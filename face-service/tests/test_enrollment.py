@@ -16,6 +16,20 @@ def test_enroll_bad_quality(client):
     assert resp.status_code == 400
 
 
+def test_enroll_rejects_turn_pose_without_head_turn(client):
+    images = [make_test_image() for _ in range(3)]
+    resp = client.post(
+        "/enroll",
+        json={
+            "user_id": 4,
+            "images": images,
+            "poses": ["turn_left", "turn_right", "front"],
+        },
+    )
+    assert resp.status_code == 400
+    assert "head turn" in resp.json()["detail"]
+
+
 def test_enroll_too_few_samples(client):
     images = [make_test_image()]
     resp = client.post("/enroll", json={"user_id": 3, "images": images})

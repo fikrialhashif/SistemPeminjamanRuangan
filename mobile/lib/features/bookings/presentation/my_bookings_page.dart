@@ -55,6 +55,7 @@ class _BookingTile extends ConsumerWidget {
     final canCancel = status == 'pending' || status == 'approved';
     final canCheckIn = status == 'approved';
     return ListTile(
+      onTap: id == null ? null : () => context.push('/bookings/$id'),
       title: Text(
         booking['title']?.toString() ??
             resource?['name']?.toString() ??

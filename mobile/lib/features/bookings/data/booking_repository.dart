@@ -66,6 +66,15 @@ class BookingRepository {
     }
   }
 
+  Future<Map<String, dynamic>> show(String id) async {
+    try {
+      final response = await _dio.get('/bookings/$id');
+      return Map<String, dynamic>.from(response.data as Map);
+    } catch (error) {
+      throw mapDioError(error);
+    }
+  }
+
   Future<void> cancel(String id) async {
     try {
       await _dio.delete('/bookings/$id');

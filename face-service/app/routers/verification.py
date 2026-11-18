@@ -4,12 +4,12 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from PIL import Image
+from PIL import Image, ImageOps
 
 from app.config import settings
-from app.services.face_engine import face_engine
-from app.services.storage import embedding_store
+from app.services.face_engine import FaceQualityError, face_engine
 from app.services.liveness import liveness_checker
+from app.services.storage import embedding_store
 
 router = APIRouter(prefix="/verify", tags=["verification"])
 
@@ -26,39 +26,71 @@ class VerifyResponse(BaseModel):
     score: float
     liveness_passed: bool
     reason: str
+    inconclusive: bool = False
 
 
 @router.post("", response_model=VerifyResponse)
 def verify(req: VerifyRequest):
     try:
         img_bytes = base64.b64decode(req.image)
-        image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+        image = ImageOps.exif_transpose(Image.open(io.BytesIO(img_bytes))).convert("RGB")
     except Exception:
         raise HTTPException(400, "Invalid image")
-
-    quality = face_engine.check_quality(image)
-    if not quality["ok"]:
-        raise HTTPException(400, f"Quality issue: {quality['reason']}")
-
-    embedding = face_engine.extract_embedding(image)
 
     stored = embedding_store.get(req.user_id)
     if stored is None:
         raise HTTPException(404, "User not enrolled")
 
-    scores = [face_engine.compare_embeddings(embedding, s) for s in stored]
+    max_yaw = (
+        settings.MAX_TURN_YAW_DEGREES
+        if req.challenge_type == "turn"
+        else settings.MAX_YAW_DEGREES
+    )
+    quality = face_engine.check_quality(image, max_yaw_degrees=max_yaw)
+    if not quality["ok"]:
+        return VerifyResponse(
+            match=False,
+            score=0.0,
+            liveness_passed=False,
+            reason=quality["reason"],
+        )
+
+    try:
+        embedding = face_engine.extract_embedding(image)
+    except FaceQualityError as error:
+        return VerifyResponse(
+            match=False,
+            score=0.0,
+            liveness_passed=False,
+            reason=error.reason,
+        )
+
+    embeddings = stored["embeddings"]
+    baseline_yaw = stored["yaw_baseline"]
+    scores = [face_engine.compare_embeddings(embedding, sample) for sample in embeddings]
     best_score = max(scores)
     matched = best_score >= settings.MATCH_THRESHOLD
 
     liveness_passed = True
     if req.challenge_type:
+        current_yaw = face_engine.yaw(image)
         liveness_passed = liveness_checker.verify_challenge(
-            req.challenge_type, req.challenge_response or {}
+            req.challenge_type,
+            req.challenge_response,
+            current_yaw,
+            baseline_yaw,
         )
+        if baseline_yaw is None:
+            return VerifyResponse(
+                match=False,
+                score=round(best_score, 4),
+                liveness_passed=False,
+                reason="Pendaftaran wajah perlu diulang agar gerakan kepala dapat diverifikasi.",
+            )
 
     reason = "Match found" if matched else "No match"
     if not liveness_passed:
-        reason = "Liveness check failed"
+        reason = "Head turn not detected"
 
     return VerifyResponse(
         match=matched and liveness_passed,

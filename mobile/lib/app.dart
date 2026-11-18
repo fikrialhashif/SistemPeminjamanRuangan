@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import 'core/session/session_expiry.dart';
 import 'features/auth/presentation/login_page.dart';
+import 'features/bookings/presentation/booking_detail_page.dart';
 import 'features/bookings/presentation/booking_form_page.dart';
 import 'features/bookings/presentation/bundled_booking_page.dart';
 import 'features/bookings/presentation/recurring_booking_page.dart';
@@ -27,6 +28,17 @@ GoRouter buildAppRouter() => GoRouter(
     GoRoute(
       path: '/bookings',
       builder: (context, state) => const MyBookingsPage(),
+    ),
+    GoRoute(
+      path: '/bookings/:bookingId',
+      builder: (context, state) {
+        final extra = state.extra;
+        final justCheckedIn = extra is Map && extra['just_checked_in'] == true;
+        return BookingDetailPage(
+          bookingId: state.pathParameters['bookingId']!,
+          justCheckedIn: justCheckedIn,
+        );
+      },
     ),
     GoRoute(
       path: '/approvals',

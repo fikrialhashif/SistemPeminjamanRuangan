@@ -38,6 +38,7 @@ Route::prefix('v1')->group(function () {
 
         Route::post('face/enroll', [FaceController::class, 'enroll']);
         Route::get('face/status', [FaceController::class, 'status']);
+        Route::get('face/challenge', [FaceController::class, 'challenge']);
         Route::delete('face', [FaceController::class, 'destroy']);
 
         Route::get('loans', [LoanController::class, 'index']);
