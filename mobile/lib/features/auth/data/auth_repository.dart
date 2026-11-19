@@ -46,4 +46,32 @@ class AuthRepository {
       throw mapDioError(error);
     }
   }
+
+  Future<Map<String, dynamic>> updateProfile(String name) async {
+    try {
+      final response = await _dio.put('/me/profile', data: {'name': name});
+      return Map<String, dynamic>.from(response.data as Map);
+    } catch (error) {
+      throw mapDioError(error);
+    }
+  }
+
+  Future<void> updatePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String confirmation,
+  }) async {
+    try {
+      await _dio.put(
+        '/me/password',
+        data: {
+          'current_password': currentPassword,
+          'password': newPassword,
+          'password_confirmation': confirmation,
+        },
+      );
+    } catch (error) {
+      throw mapDioError(error);
+    }
+  }
 }

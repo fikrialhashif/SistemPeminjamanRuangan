@@ -20,6 +20,8 @@ Route::prefix('v1')->group(function () {
     Route::middleware(['auth:sanctum', 'check.suspension'])->group(function () {
         Route::post('/auth/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me']);
+        Route::put('/me/profile', [AuthController::class, 'updateProfile']);
+        Route::put('/me/password', [AuthController::class, 'updatePassword']);
 
         Route::apiResource('resources', ResourceController::class);
         Route::get('resources/{resource}/availability', [ResourceController::class, 'availability']);

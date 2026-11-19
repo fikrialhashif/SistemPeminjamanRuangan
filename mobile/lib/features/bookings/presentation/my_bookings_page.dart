@@ -9,6 +9,7 @@ import '../../../core/widgets/app_chrome.dart';
 import '../../../core/widgets/app_components.dart';
 import '../../../core/widgets/status_views.dart';
 import '../../../core/widgets/user_quick_access_sheet.dart';
+import '../../auth/presentation/auth_controller.dart';
 import '../data/booking_repository.dart';
 import 'booking_providers.dart';
 
@@ -18,13 +19,14 @@ class MyBookingsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final bookings = ref.watch(bookingsProvider);
+    final showApprovals = ref.watch(approvalAccessProvider);
     return Scaffold(
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
             AppBrandHeader(
-              section: '04 Booking Saya',
+              section: 'Booking Saya',
               onAvatarTap: () => showUserQuickAccessSheet(context),
             ),
             Expanded(
@@ -79,7 +81,10 @@ class MyBookingsPage extends ConsumerWidget {
           ],
         ),
       ),
-      bottomNavigationBar: const AppBottomNav(currentIndex: 2),
+      bottomNavigationBar: AppBottomNav(
+        currentIndex: 2,
+        showApprovals: showApprovals,
+      ),
     );
   }
 }

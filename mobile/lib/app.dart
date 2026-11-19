@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import 'core/session/session_expiry.dart';
 import 'core/theme/app_theme.dart';
-import 'features/auth/presentation/login_page.dart';
 import 'features/bookings/presentation/booking_detail_page.dart';
 import 'features/bookings/presentation/booking_form_page.dart';
 import 'features/bookings/presentation/booking_selection.dart';
@@ -15,16 +14,19 @@ import 'features/bookings/presentation/waitlist_page.dart';
 import 'features/bookings/presentation/my_bookings_page.dart';
 import 'features/check_in/presentation/check_in_page.dart';
 import 'features/face/presentation/face_enrollment_page.dart';
+import 'features/approvals/presentation/approval_decision_page.dart';
 import 'features/approvals/presentation/approvals_page.dart';
 import 'features/resources/presentation/resources_page.dart';
 import 'features/resources/presentation/room_features_page.dart';
 import 'features/loans/presentation/manager_loans_page.dart';
 import 'features/notifications/presentation/notifications_page.dart';
 import 'features/notifications/presentation/penalties_page.dart';
+import 'features/onboarding/presentation/startup_page.dart';
+import 'features/profile/presentation/profile_page.dart';
 
 GoRouter buildAppRouter() => GoRouter(
   routes: [
-    GoRoute(path: '/', builder: (context, state) => const LoginPage()),
+    GoRoute(path: '/', builder: (context, state) => const StartupPage()),
     GoRoute(
       path: '/resources',
       builder: (context, state) => const ResourcesPage(),
@@ -65,6 +67,18 @@ GoRouter buildAppRouter() => GoRouter(
     GoRoute(
       path: '/approvals',
       builder: (context, state) => const ApprovalsPage(),
+      routes: [
+        GoRoute(
+          path: ':approvalId',
+          builder: (context, state) {
+            final approval = state.extra;
+            if (approval is! Map<String, dynamic>) {
+              return const Scaffold(body: SizedBox.shrink());
+            }
+            return ApprovalDecisionPage(approval: approval);
+          },
+        ),
+      ],
     ),
     GoRoute(
       path: '/face/enrollment',
@@ -111,6 +125,7 @@ GoRouter buildAppRouter() => GoRouter(
       path: '/penalties',
       builder: (context, state) => const PenaltiesPage(),
     ),
+    GoRoute(path: '/profile', builder: (context, state) => const ProfilePage()),
   ],
 );
 

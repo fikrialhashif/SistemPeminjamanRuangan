@@ -31,7 +31,7 @@ class BookingDetailPage extends ConsumerWidget {
         child: Column(
           children: [
             AppDetailHeader(
-              eyebrow: '05 Detail Booking & Bukti Check-in',
+              eyebrow: 'Detail Booking & Bukti Check-in',
               title: 'Detail booking',
               onBack: () {
                 if (context.canPop()) {

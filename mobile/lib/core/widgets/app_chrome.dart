@@ -206,12 +206,47 @@ class AppDetailHeader extends StatelessWidget {
 }
 
 class AppBottomNav extends StatelessWidget {
-  const AppBottomNav({required this.currentIndex, super.key});
+  const AppBottomNav({
+    required this.currentIndex,
+    required this.showApprovals,
+    super.key,
+  });
 
   final int currentIndex;
+  final bool showApprovals;
 
   @override
   Widget build(BuildContext context) {
+    final routes = [
+      '/resources',
+      '/rooms',
+      '/bookings',
+      if (showApprovals) '/approvals',
+    ];
+    final items = [
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.grid_view_outlined),
+        activeIcon: Icon(Icons.grid_view_rounded),
+        label: 'Katalog',
+      ),
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.meeting_room_outlined),
+        activeIcon: Icon(Icons.meeting_room_rounded),
+        label: 'Fitur Ruang',
+      ),
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.event_note_outlined),
+        activeIcon: Icon(Icons.event_note_rounded),
+        label: 'Booking Saya',
+      ),
+      if (showApprovals)
+        const BottomNavigationBarItem(
+          icon: Icon(Icons.fact_check_outlined),
+          activeIcon: Icon(Icons.fact_check_rounded),
+          label: 'Persetujuan',
+        ),
+    ];
+
     return DecoratedBox(
       decoration: const BoxDecoration(
         color: AppColors.surface,
@@ -220,29 +255,12 @@ class AppBottomNav extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: BottomNavigationBar(
-          currentIndex: currentIndex,
+          currentIndex: currentIndex.clamp(0, items.length - 1),
           onTap: (index) {
             if (index == currentIndex) return;
-            const routes = ['/resources', '/rooms', '/bookings'];
             context.go(routes[index]);
           },
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.grid_view_outlined),
-              activeIcon: Icon(Icons.grid_view_rounded),
-              label: 'Katalog',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.meeting_room_outlined),
-              activeIcon: Icon(Icons.meeting_room_rounded),
-              label: 'Fitur Ruang',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.event_note_outlined),
-              activeIcon: Icon(Icons.event_note_rounded),
-              label: 'Booking Saya',
-            ),
-          ],
+          items: items,
         ),
       ),
     );

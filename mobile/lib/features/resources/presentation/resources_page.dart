@@ -7,6 +7,7 @@ import '../../../core/widgets/app_chrome.dart';
 import '../../../core/widgets/app_components.dart';
 import '../../../core/widgets/status_views.dart';
 import '../../../core/widgets/user_quick_access_sheet.dart';
+import '../../auth/presentation/auth_controller.dart';
 import '../../face/data/face_providers.dart';
 import 'resource_entry.dart';
 import 'resource_providers.dart';
@@ -28,13 +29,14 @@ class _ResourcesPageState extends ConsumerState<ResourcesPage> {
       resourceListProvider(ResourceFilter(search: search, type: type)),
     );
     final faceStatus = ref.watch(faceStatusProvider);
+    final showApprovals = ref.watch(approvalAccessProvider);
     return Scaffold(
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
             AppBrandHeader(
-              section: '02 Daftar Resource',
+              section: 'Daftar Resource',
               onNotificationsTap: () => context.push('/notifications'),
               onAvatarTap: () => showUserQuickAccessSheet(context),
             ),
@@ -182,7 +184,10 @@ class _ResourcesPageState extends ConsumerState<ResourcesPage> {
           ],
         ),
       ),
-      bottomNavigationBar: const AppBottomNav(currentIndex: 0),
+      bottomNavigationBar: AppBottomNav(
+        currentIndex: 0,
+        showApprovals: showApprovals,
+      ),
     );
   }
 

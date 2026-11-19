@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/auth_controller.dart';
 import '../../features/face/data/face_providers.dart';
+import '../session/user_role.dart';
 import '../theme/app_theme.dart';
 import 'app_components.dart';
 
@@ -76,6 +77,19 @@ class UserQuickAccessSheet extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 12),
+            _QuickItem(
+              icon: Icons.person_outline_rounded,
+              title: 'Profil saya',
+              subtitle: 'Ubah nama & password',
+              onTap: () => _open(context, '/profile'),
+            ),
+            if (UserRole.shouldShowApprovals(user))
+              _QuickItem(
+                icon: Icons.fact_check_outlined,
+                title: 'Persetujuan',
+                subtitle: 'Tinjau pengajuan booking',
+                onTap: () => _open(context, '/approvals'),
+              ),
             _QuickItem(
               icon: Icons.face_retouching_natural,
               title: 'Daftar wajah',

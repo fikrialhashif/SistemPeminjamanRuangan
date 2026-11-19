@@ -7,6 +7,7 @@ import '../../../core/widgets/app_chrome.dart';
 import '../../../core/widgets/app_components.dart';
 import '../../../core/widgets/status_views.dart';
 import '../../../core/widgets/user_quick_access_sheet.dart';
+import '../../auth/presentation/auth_controller.dart';
 import 'resource_providers.dart';
 
 class RoomFeaturesPage extends ConsumerWidget {
@@ -17,13 +18,14 @@ class RoomFeaturesPage extends ConsumerWidget {
     final rooms = ref.watch(
       resourceListProvider(const ResourceFilter(type: 'room')),
     );
+    final showApprovals = ref.watch(approvalAccessProvider);
     return Scaffold(
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
             AppBrandHeader(
-              section: '03 Fitur Ruang',
+              section: 'Fitur Ruang',
               onAvatarTap: () => _openQuickAccess(context),
             ),
             Expanded(
@@ -99,7 +101,10 @@ class RoomFeaturesPage extends ConsumerWidget {
           ],
         ),
       ),
-      bottomNavigationBar: const AppBottomNav(currentIndex: 1),
+      bottomNavigationBar: AppBottomNav(
+        currentIndex: 1,
+        showApprovals: showApprovals,
+      ),
     );
   }
 

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:mobile/core/storage/token_storage.dart';
+import 'package:mobile/features/onboarding/data/onboarding_storage.dart';
 
 class FakeTokenStorage extends TokenStorage {
   String? token;
@@ -17,12 +18,25 @@ class FakeTokenStorage extends TokenStorage {
   Future<void> clear() async => token = null;
 }
 
+class FakeOnboardingStorage extends OnboardingStorage {
+  FakeOnboardingStorage({this.completed = false});
+
+  bool completed;
+
+  @override
+  Future<bool> isCompleted() async => completed;
+
+  @override
+  Future<void> markCompleted() async => completed = true;
+}
+
 class FakeBackend implements HttpClientAdapter {
   final List<RequestOptions> requests = [];
   final List<String> hosts = <String>[];
   final Set<String> failHosts = <String>{};
   bool rejectCheckIn = false;
   bool unauthorizedOnMe = false;
+  List<String>? loginRoleNames;
   int bookingId = 9;
 
   Map<String, dynamic>? lastJsonBody(String pathSuffix) {
@@ -53,13 +67,48 @@ class FakeBackend implements HttpClientAdapter {
     final path = options.uri.path;
 
     if (path.endsWith('/auth/login') && options.method == 'POST') {
+      final roles = (loginRoleNames ?? const <String>[])
+          .map((name) => {'id': 1, 'name': name})
+          .toList();
       return _json({
         'token': 'test-token',
-        'user': {'id': 1, 'name': 'Budi', 'role': 'user'},
+        'user': {'id': 1, 'name': 'Budi', 'role': 'user', 'roles': roles},
       });
     }
     if (path.endsWith('/auth/logout')) {
       return _json({'message': 'Logged out.'});
+    }
+    if (path.endsWith('/approvals/pending')) {
+      return _json({
+        'data': [
+          {
+            'id': 3,
+            'booking': {
+              'id': 9,
+              'starts_at': '2026-11-17T02:00:00Z',
+              'resource': {'name': 'Ruang Rapat A'},
+              'user': {'name': 'Siti'},
+            },
+          },
+        ],
+        'total': 1,
+      });
+    }
+    if (path.contains('/approvals/') && options.method == 'POST') {
+      return _json({'message': 'Keputusan tersimpan.'});
+    }
+    if (path.endsWith('/me/profile') && options.method == 'PUT') {
+      final data = options.data is Map ? options.data as Map : const {};
+      return _json({
+        'id': 1,
+        'name': data['name'],
+        'email': 'budi@example.com',
+        'roles': <Object>[],
+        'department': null,
+      });
+    }
+    if (path.endsWith('/me/password') && options.method == 'PUT') {
+      return _json({'message': 'Password berhasil diperbarui.'});
     }
     if (path.endsWith('/me')) {
       if (unauthorizedOnMe) {
