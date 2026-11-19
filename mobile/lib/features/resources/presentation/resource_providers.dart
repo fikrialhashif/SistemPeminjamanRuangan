@@ -15,6 +15,11 @@ final resourceListProvider =
           ),
     );
 
+final resourceDetailProvider =
+    FutureProvider.family<Map<String, dynamic>, String>(
+      (ref, id) => ref.read(resourceRepositoryProvider).get(id),
+    );
+
 class ResourceFilter {
   const ResourceFilter({
     this.search = '',

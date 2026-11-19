@@ -3,9 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'core/session/session_expiry.dart';
+import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/login_page.dart';
 import 'features/bookings/presentation/booking_detail_page.dart';
 import 'features/bookings/presentation/booking_form_page.dart';
+import 'features/bookings/presentation/booking_selection.dart';
+import 'features/bookings/presentation/room_schedule_page.dart';
 import 'features/bookings/presentation/bundled_booking_page.dart';
 import 'features/bookings/presentation/recurring_booking_page.dart';
 import 'features/bookings/presentation/waitlist_page.dart';
@@ -14,6 +17,7 @@ import 'features/check_in/presentation/check_in_page.dart';
 import 'features/face/presentation/face_enrollment_page.dart';
 import 'features/approvals/presentation/approvals_page.dart';
 import 'features/resources/presentation/resources_page.dart';
+import 'features/resources/presentation/room_features_page.dart';
 import 'features/loans/presentation/manager_loans_page.dart';
 import 'features/notifications/presentation/notifications_page.dart';
 import 'features/notifications/presentation/penalties_page.dart';
@@ -24,6 +28,24 @@ GoRouter buildAppRouter() => GoRouter(
     GoRoute(
       path: '/resources',
       builder: (context, state) => const ResourcesPage(),
+    ),
+    GoRoute(
+      path: '/rooms',
+      builder: (context, state) => const RoomFeaturesPage(),
+    ),
+    GoRoute(
+      path: '/rooms/:resourceId/schedule',
+      builder: (context, state) {
+        final extra = state.extra;
+        final args = extra is RoomScheduleArgs
+            ? extra
+            : const RoomScheduleArgs();
+        return RoomSchedulePage(
+          resourceId: state.pathParameters['resourceId']!,
+          initialDate: args.initialDate,
+          pickSlot: args.pickSlot,
+        );
+      },
     ),
     GoRoute(
       path: '/bookings',
@@ -69,8 +91,13 @@ GoRouter buildAppRouter() => GoRouter(
     ),
     GoRoute(
       path: '/bookings/new/:resourceId',
-      builder: (context, state) =>
-          BookingFormPage(resourceId: state.pathParameters['resourceId']!),
+      builder: (context, state) {
+        final extra = state.extra;
+        return BookingFormPage(
+          resourceId: state.pathParameters['resourceId']!,
+          initialSelection: extra is BookingSlotSelection ? extra : null,
+        );
+      },
     ),
     GoRoute(
       path: '/manager/loans',
@@ -104,10 +131,7 @@ class _BookingAppState extends ConsumerState<BookingApp> {
     });
     return MaterialApp.router(
       title: 'Smart Room Booking',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.light,
       routerConfig: _router,
     );
   }

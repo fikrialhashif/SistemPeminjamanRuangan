@@ -35,6 +35,30 @@ def test_verify_enforces_head_turn_from_image(client, monkeypatch):
     assert ok["match"] is True
 
 
+def test_verify_uses_front_image_for_identity_and_turn_image_for_liveness(
+    client, monkeypatch
+):
+    images = [make_test_image() for _ in range(3)]
+    client.post("/enroll", json={"user_id": 13, "images": images})
+    monkeypatch.setattr(
+        "app.services.face_engine.face_engine.yaw",
+        lambda image: 30.0 if image.getpixel((0, 0))[0] > 150 else 0.0,
+    )
+
+    result = client.post(
+        "/verify",
+        json={
+            "user_id": 13,
+            "image": make_test_image(color=(200, 200, 200)),
+            "front_image": make_test_image(color=(128, 128, 128)),
+            "challenge_type": "turn",
+            "challenge_response": {"action": "turn"},
+        },
+    ).json()
+    assert result["match"] is True
+    assert result["liveness_passed"] is True
+
+
 def test_client_declared_action_cannot_bypass_head_turn(client, monkeypatch):
     images = [make_test_image() for _ in range(3)]
     client.post("/enroll", json={"user_id": 12, "images": images})

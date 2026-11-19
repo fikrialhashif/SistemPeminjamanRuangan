@@ -18,6 +18,7 @@ class CheckInRepository {
     required String qrToken,
     required LocationEvidence location,
     String? faceImageBase64,
+    String? faceFrontImageBase64,
     String? faceChallenge,
     Map<String, dynamic>? faceChallengeResponse,
   }) async {
@@ -28,6 +29,7 @@ class CheckInRepository {
           'qr_token': qrToken,
           ...location.toJson(),
           'face_image': ?faceImageBase64,
+          'face_front_image': ?faceFrontImageBase64,
           'face_challenge': ?faceChallenge,
           'face_challenge_response': ?faceChallengeResponse,
         },
@@ -55,6 +57,15 @@ String checkInReasonMessage(String? code) =>
           'Verifikasi liveness gagal. Ulangi gerakan yang diminta.',
     }[code] ??
     'Check-in ditolak. Ikuti petunjuk lalu coba lagi.';
+
+bool isFaceIdentityMismatch(Map<String, dynamic> result) {
+  final reasons = result['rejection_reasons'];
+  if (reasons is! List) return false;
+  return reasons.any((reason) {
+    final value = reason.toString().toLowerCase();
+    return value.contains('verification failed') || value.contains('no match');
+  });
+}
 
 String checkInDecisionMessage(Map<String, dynamic> result) {
   final state = result['result']?.toString() ?? result['status']?.toString();
@@ -118,6 +129,9 @@ String _reasonFromServer(String reason) {
     }
     if (value.contains('unavailable')) {
       return 'Layanan wajah sedang tidak tersedia. Verifikasi manual diperlukan.';
+    }
+    if (value.contains('verification failed')) {
+      return 'Wajah tidak sesuai dengan data wajah yang terdaftar.';
     }
     return 'Verifikasi wajah gagal. Posisikan wajah di dalam bingkai.';
   }

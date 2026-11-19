@@ -15,7 +15,7 @@ const _months = [
 
 const _wibOffset = Duration(hours: 7);
 
-DateTime? _parseWib(Object? value) {
+DateTime? parseWibDateTime(Object? value) {
   if (value is! String || value.isEmpty) return null;
   final parsed = DateTime.tryParse(value);
   if (parsed == null) return null;
@@ -23,7 +23,7 @@ DateTime? _parseWib(Object? value) {
 }
 
 String formatWibDateTime(Object? value) {
-  final date = _parseWib(value);
+  final date = parseWibDateTime(value);
   if (date == null) return '-';
   final hour = date.hour.toString().padLeft(2, '0');
   final minute = date.minute.toString().padLeft(2, '0');
@@ -31,9 +31,17 @@ String formatWibDateTime(Object? value) {
 }
 
 String formatWibDate(Object? value) {
-  final date = _parseWib(value);
+  final date = parseWibDateTime(value);
   if (date == null) return '-';
   return '${date.day} ${_months[date.month - 1]} ${date.year}';
+}
+
+String formatWibTime(Object? value) {
+  final date = parseWibDateTime(value);
+  if (date == null) return '-';
+  final hour = date.hour.toString().padLeft(2, '0');
+  final minute = date.minute.toString().padLeft(2, '0');
+  return '$hour:$minute';
 }
 
 String statusLabel(Object? status) =>

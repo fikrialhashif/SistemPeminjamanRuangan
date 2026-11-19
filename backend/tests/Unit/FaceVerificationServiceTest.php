@@ -60,12 +60,14 @@ class FaceVerificationServiceTest extends TestCase
             'base64-image',
             'turn_left',
             ['action' => 'turn_left'],
+            'base64-front-image',
         );
 
         Http::assertSent(function ($request) {
             return $request->url() === 'http://face-service:8001/verify'
                 && $request['challenge_type'] === 'turn_left'
-                && $request['challenge_response'] === ['action' => 'turn_left'];
+                && $request['challenge_response'] === ['action' => 'turn_left']
+                && $request['front_image'] === 'base64-front-image';
         });
     }
 

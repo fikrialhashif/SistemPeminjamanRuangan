@@ -27,7 +27,48 @@ void main() {
     final message = checkInDecisionMessage(result);
     expect(message, contains('QR sudah kedaluwarsa'));
     expect(message, contains('Lokasi tiruan'));
-    expect(message, contains('Verifikasi wajah gagal'));
+    expect(message, contains('Wajah tidak sesuai'));
+  });
+
+  test('membedakan wajah tidak sesuai dan kegagalan liveness', () {
+    expect(
+      checkInDecisionMessage({
+        'result': 'rejected',
+        'rejection_reasons': ['face: verification failed'],
+      }),
+      contains('Wajah tidak sesuai'),
+    );
+    expect(
+      checkInDecisionMessage({
+        'result': 'rejected',
+        'rejection_reasons': ['face: liveness check failed'],
+      }),
+      contains('Liveness gagal'),
+    );
+  });
+
+  test('ketidaksesuaian identitas tidak dianggap gagal liveness yang bisa diulang otomatis', () {
+    expect(
+      isFaceIdentityMismatch({
+        'rejection_reasons': ['face: verification failed'],
+      }),
+      isTrue,
+    );
+    expect(
+      isFaceIdentityMismatch({
+        'rejection_reasons': ['face: liveness check failed'],
+      }),
+      isFalse,
+    );
+    expect(
+      isFaceIdentityMismatch({
+        'rejection_reasons': [
+          'face: liveness check failed',
+          'face: verification failed',
+        ],
+      }),
+      isTrue,
+    );
   });
 
   test('hasil accepted dan needs_manual_review', () {

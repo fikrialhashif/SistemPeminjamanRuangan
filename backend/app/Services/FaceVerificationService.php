@@ -31,12 +31,16 @@ class FaceVerificationService
         return $response->throw()->json();
     }
 
-    public function verify(User $user, string $image, ?string $challengeType = null, ?array $challengeResponse = null): array
+    public function verify(User $user, string $image, ?string $challengeType = null, ?array $challengeResponse = null, ?string $frontImage = null): array
     {
         $payload = [
             'user_id' => $user->id,
             'image' => $image,
         ];
+
+        if ($frontImage) {
+            $payload['front_image'] = $frontImage;
+        }
 
         if ($challengeType) {
             $payload['challenge_type'] = $challengeType;

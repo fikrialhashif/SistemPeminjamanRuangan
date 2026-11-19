@@ -65,6 +65,7 @@ class CheckInDecisionService
 
         if ($faceEnabled) {
             $faceImage = $evidence['face_image'] ?? null;
+            $faceFrontImage = $evidence['face_front_image'] ?? null;
             $challenge = $evidence['face_challenge'] ?? null;
             $challengeResponse = $evidence['face_challenge_response'] ?? null;
 
@@ -73,6 +74,9 @@ class CheckInDecisionService
             if (! $faceImage) {
                 $faceValid = false;
                 $rejectionReasons[] = 'face: image not provided';
+            } elseif (! $faceFrontImage) {
+                $faceValid = false;
+                $rejectionReasons[] = 'face: front image not provided';
             } elseif (! $expectedChallenge) {
                 $faceValid = false;
                 $rejectionReasons[] = 'face: challenge missing';
@@ -89,15 +93,17 @@ class CheckInDecisionService
                         $faceImage,
                         $expectedChallenge,
                         $challengeResponse,
+                        $faceFrontImage,
                     );
                     $faceScore = $faceResult['score'] ?? null;
                     $livenessPassed = $faceResult['liveness_passed'] ?? null;
 
                     if (($faceResult['match'] ?? false) === false) {
                         $faceValid = false;
-                        $rejectionReasons[] = $livenessPassed === false
-                            ? 'face: liveness check failed'
-                            : 'face: verification failed';
+                        if ($livenessPassed === false) {
+                            $rejectionReasons[] = 'face: liveness check failed';
+                        }
+                        $rejectionReasons[] = 'face: verification failed';
                     }
 
                     if ($faceResult['inconclusive'] ?? false) {

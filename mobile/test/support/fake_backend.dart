@@ -19,6 +19,8 @@ class FakeTokenStorage extends TokenStorage {
 
 class FakeBackend implements HttpClientAdapter {
   final List<RequestOptions> requests = [];
+  final List<String> hosts = <String>[];
+  final Set<String> failHosts = <String>{};
   bool rejectCheckIn = false;
   bool unauthorizedOnMe = false;
   int bookingId = 9;
@@ -40,6 +42,14 @@ class FakeBackend implements HttpClientAdapter {
     Future<void>? cancelFuture,
   ) async {
     requests.add(options);
+    hosts.add(options.uri.host);
+    if (failHosts.contains(options.uri.host)) {
+      throw DioException(
+        requestOptions: options,
+        type: DioExceptionType.connectionError,
+        error: 'Connection refused',
+      );
+    }
     final path = options.uri.path;
 
     if (path.endsWith('/auth/login') && options.method == 'POST') {

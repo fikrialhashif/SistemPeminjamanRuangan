@@ -16,8 +16,8 @@ Aplikasi **tidak** membundel `.env`. Base URL diberikan saat build:
 flutter build apk --release --dart-define=API_BASE_URL=https://staging.example.com/api/v1
 ```
 
-- Tanpa `--dart-define`, aplikasi memakai `http://10.0.2.2:8000/api/v1` (emulator Android ke backend lokal).
-- Untuk perangkat fisik lewat USB: `adb reverse tcp:8000 tcp:8000` lalu build dengan `--dart-define=API_BASE_URL=http://127.0.0.1:8000/api/v1`. Tanpa kabel, pakai IP LAN komputer, mis. `--dart-define=API_BASE_URL=http://192.168.1.32:8000/api/v1` (perangkat harus satu jaringan dan firewall mengizinkan port 8000).
+- Tanpa `--dart-define`, build debug mencoba `http://10.0.2.2:8000/api/v1` (emulator) lalu otomatis `http://127.0.0.1:8000/api/v1` jika koneksi gagal.
+- Untuk perangkat fisik lewat USB, jalankan `adb reverse tcp:8000 tcp:8000` sebelum `flutter run` agar fallback `127.0.0.1` tersedia. Port forwarding bisa hilang saat kabel/adb terputus; cek dengan `adb reverse --list`. Alternatif lebih stabil selama HP dan komputer satu WiFi: `--dart-define=API_BASE_URL=http://192.168.100.171:8000/api/v1` (sesuaikan IP LAN komputer dan firewall yang mengizinkan port 8000).
 - Build rilis memblokir HTTP cleartext (default Android untuk targetSdk modern). Gunakan HTTPS untuk staging.
 - Jangan commit `.env`, `key.properties`, atau keystore.
 

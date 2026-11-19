@@ -3,7 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/formatting/formatters.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_chrome.dart';
+import '../../../core/widgets/app_components.dart';
 import '../../../core/widgets/status_views.dart';
+import '../../../core/widgets/user_quick_access_sheet.dart';
 import '../../check_in/data/check_in_repository.dart';
 import 'booking_providers.dart';
 
@@ -22,28 +26,44 @@ class BookingDetailPage extends ConsumerWidget {
     final detail = ref.watch(bookingDetailProvider(bookingId));
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Detail booking'),
-        actions: [
-          IconButton(
-            tooltip: 'Muat ulang',
-            icon: const Icon(Icons.refresh),
-            onPressed: () => ref.invalidate(bookingDetailProvider(bookingId)),
-          ),
-        ],
-      ),
-      body: detail.when(
-        loading: () => const Center(
-          child: CircularProgressIndicator(
-            semanticsLabel: 'Memuat detail booking',
-          ),
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            AppDetailHeader(
+              eyebrow: '05 Detail Booking & Bukti Check-in',
+              title: 'Detail booking',
+              onBack: () {
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.go('/bookings');
+                }
+              },
+              onAvatarTap: () => showUserQuickAccessSheet(context),
+            ),
+            Expanded(
+              child: detail.when(
+                loading: () => const Center(
+                  child: CircularProgressIndicator(
+                    semanticsLabel: 'Memuat detail booking',
+                  ),
+                ),
+                error: (error, _) => ErrorView(
+                  error: error,
+                  onRetry: () =>
+                      ref.invalidate(bookingDetailProvider(bookingId)),
+                ),
+                data: (booking) => _BookingDetailBody(
+                  booking: booking,
+                  justCheckedIn: justCheckedIn,
+                  onRefresh: () =>
+                      ref.invalidate(bookingDetailProvider(bookingId)),
+                ),
+              ),
+            ),
+          ],
         ),
-        error: (error, _) => ErrorView(
-          error: error,
-          onRetry: () => ref.invalidate(bookingDetailProvider(bookingId)),
-        ),
-        data: (booking) =>
-            _BookingDetailBody(booking: booking, justCheckedIn: justCheckedIn),
       ),
     );
   }
@@ -53,10 +73,12 @@ class _BookingDetailBody extends StatelessWidget {
   const _BookingDetailBody({
     required this.booking,
     required this.justCheckedIn,
+    required this.onRefresh,
   });
 
   final Map<String, dynamic> booking;
   final bool justCheckedIn;
+  final VoidCallback onRefresh;
 
   @override
   Widget build(BuildContext context) {
@@ -77,19 +99,28 @@ class _BookingDetailBody extends StatelessWidget {
     final accepted = status == 'checked_in' || latest?['result'] == 'accepted';
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
       children: [
-        if (justCheckedIn || accepted) _successBanner(colorScheme),
-        if (status == 'pending')
+        _ReceiptMetaBar(onRefresh: onRefresh),
+        const SizedBox(height: 12),
+        if (justCheckedIn || accepted) ...[
+          _successBanner(colorScheme),
+          const SizedBox(height: 14),
+        ],
+        if (status == 'pending') ...[
           _infoBanner(
+            context,
             colorScheme,
             icon: Icons.schedule,
             title: 'Menunggu persetujuan approver',
             description: 'Check-in tersedia setelah booking ini disetujui.',
           ),
+          const SizedBox(height: 14),
+        ],
         _section(
+          context,
           title: 'Informasi booking',
-          icon: Icons.receipt_long,
+          icon: Icons.receipt_long_outlined,
           children: [
             _InfoRow(
               label: 'Judul',
@@ -116,9 +147,11 @@ class _BookingDetailBody extends StatelessWidget {
               _InfoRow(label: 'Catatan', value: booking['notes'].toString()),
           ],
         ),
+        const SizedBox(height: 14),
         _section(
+          context,
           title: 'Bukti check-in',
-          icon: Icons.how_to_reg,
+          icon: Icons.fact_check_outlined,
           children: [
             if (latest == null)
               const Padding(
@@ -126,10 +159,36 @@ class _BookingDetailBody extends StatelessWidget {
                 child: Text('Belum ada check-in untuk booking ini.'),
               )
             else ...[
-              _InfoRow(
-                label: 'Waktu',
-                value: formatWibDateTime(latest['created_at']),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.mintSoft,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.schedule_rounded,
+                      size: 16,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Tercatat: ${formatWibDateTime(latest['created_at'])}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.text,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(height: 8),
               _ProofRow(label: 'QR ruangan', valid: latest['qr_valid'] == true),
               _ProofRow(
                 label: 'Lokasi',
@@ -158,38 +217,88 @@ class _BookingDetailBody extends StatelessWidget {
             ],
           ],
         ),
-        const SizedBox(height: 24),
-        FilledButton.icon(
-          onPressed: () => context.go('/bookings'),
-          icon: const Icon(Icons.arrow_back),
-          label: const Text('Kembali ke daftar booking'),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: () => context.go('/bookings'),
+            icon: const Icon(Icons.arrow_back_rounded),
+            label: const Text('Kembali ke daftar booking'),
+          ),
         ),
       ],
     );
   }
 
-  Widget _successBanner(ColorScheme colorScheme) => _infoBanner(
-    colorScheme,
-    icon: Icons.check_circle,
-    title: 'Check-in berhasil',
-    description: 'Bukti check-in ditampilkan pada detail booking ini.',
+  Widget _successBanner(ColorScheme colorScheme) => Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        colors: [AppColors.primaryDark, AppColors.primary],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Row(
+      children: [
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: const Icon(
+            Icons.check_circle_rounded,
+            color: Colors.white,
+            size: 28,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Check-in berhasil',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                'Bukti check-in ditampilkan pada detail booking ini.',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.78),
+                  fontSize: 12,
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
   );
 
   Widget _infoBanner(
+    BuildContext context,
     ColorScheme colorScheme, {
     required IconData icon,
     required String title,
     required String description,
   }) => Container(
-    margin: const EdgeInsets.only(bottom: 16),
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: colorScheme.primaryContainer,
-      borderRadius: BorderRadius.circular(16),
+      color: AppColors.warningSoft,
+      borderRadius: BorderRadius.circular(18),
     ),
     child: Row(
       children: [
-        Icon(icon, color: colorScheme.onPrimaryContainer, size: 36),
+        Icon(icon, color: AppColors.warning, size: 32),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -197,17 +306,14 @@ class _BookingDetailBody extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: TextStyle(
-                  color: colorScheme.onPrimaryContainer,
+                style: const TextStyle(
+                  color: AppColors.text,
                   fontWeight: FontWeight.bold,
-                  fontSize: 16,
+                  fontSize: 15,
                 ),
               ),
               const SizedBox(height: 4),
-              Text(
-                description,
-                style: TextStyle(color: colorScheme.onPrimaryContainer),
-              ),
+              Text(description, style: Theme.of(context).textTheme.bodySmall),
             ],
           ),
         ),
@@ -215,30 +321,70 @@ class _BookingDetailBody extends StatelessWidget {
     ),
   );
 
-  Widget _section({
+  Widget _section(
+    BuildContext context, {
     required String title,
     required IconData icon,
     required List<Widget> children,
-  }) => Card(
-    margin: const EdgeInsets.only(bottom: 16),
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 20),
-              const SizedBox(width: 8),
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ...children,
-        ],
-      ),
+  }) => AppSectionCard(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            AppIconBox(icon: icon, size: 34),
+            const SizedBox(width: 10),
+            Text(title, style: Theme.of(context).textTheme.titleMedium),
+          ],
+        ),
+        const SizedBox(height: 14),
+        ...children,
+      ],
     ),
   );
+}
+
+class _ReceiptMetaBar extends StatelessWidget {
+  const _ReceiptMetaBar({required this.onRefresh});
+
+  final VoidCallback onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 7,
+          height: 7,
+          decoration: const BoxDecoration(
+            color: AppColors.accent,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            'TIKET TERVERIFIKASI OTOMATIS',
+            style: Theme.of(context).textTheme.labelSmall,
+          ),
+        ),
+        OutlinedButton.icon(
+          onPressed: onRefresh,
+          icon: const Icon(Icons.refresh_rounded, size: 16),
+          label: const Text('Segarkan'),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(0, 36),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            backgroundColor: AppColors.surface,
+            textStyle: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _InfoRow extends StatelessWidget {
@@ -249,19 +395,21 @@ class _InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 4),
+    padding: const EdgeInsets.symmetric(vertical: 5),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          width: 96,
+          width: 104,
+          child: Text(label, style: Theme.of(context).textTheme.bodySmall),
+        ),
+        Expanded(
           child: Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall
-                ?.copyWith(color: Theme.of(context).colorScheme.outline),
+            value,
+            style: Theme.of(context).textTheme.bodyMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
           ),
         ),
-        Expanded(child: Text(value)),
       ],
     ),
   );
@@ -276,24 +424,41 @@ class _ProofRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 7),
       child: Row(
         children: [
-          Icon(
-            valid ? Icons.check_circle : Icons.cancel,
-            size: 20,
-            color: valid ? colorScheme.primary : colorScheme.error,
+          AppIconBox(
+            icon: valid ? Icons.verified_rounded : Icons.error_outline_rounded,
+            size: 34,
+            backgroundColor: valid ? AppColors.mintSoft : AppColors.dangerSoft,
+            foregroundColor: valid ? AppColors.primary : AppColors.danger,
           ),
           const SizedBox(width: 10),
-          Expanded(child: Text(label)),
-          if (detail != null)
-            Text(
-              detail!,
-              style: Theme.of(context).textTheme.bodySmall
-                  ?.copyWith(color: colorScheme.outline),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.bodyMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                if (detail != null) ...[
+                  const SizedBox(height: 2),
+                  Text(detail!, style: Theme.of(context).textTheme.bodySmall),
+                ],
+              ],
             ),
+          ),
+          AppPill(
+            label: valid ? 'Terverifikasi' : 'Gagal',
+            icon: valid ? Icons.check_rounded : Icons.close_rounded,
+            backgroundColor: valid
+                ? AppColors.mintStrong
+                : AppColors.dangerSoft,
+            foregroundColor: valid ? AppColors.primary : AppColors.danger,
+          ),
         ],
       ),
     );

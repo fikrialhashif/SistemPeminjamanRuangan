@@ -24,7 +24,8 @@
 - Booking ruangan (`type = room`) sekarang ditolak dengan HTTP 422 `{code: "face_enrollment_required", message: "..."}` bila `face_verification_enabled` aktif dan pengguna belum memiliki `face_enrollments.status = enrolled`. Booking aset tidak terpengaruh. Flutter memakai `code` ini untuk membuka pendaftaran wajah dari katalog/form booking.
 - Alur pendaftaran: `POST /api/v1/face/enroll` dengan `{consent: true, images: [3 × base64 JPEG], poses: ["turn_left", "turn_right", "front"]}`, cek `GET /api/v1/face/status`, hapus dengan `DELETE /api/v1/face`. Face-service menyimpan baseline yaw dan menolak pendaftaran bila sampel toleh tidak benar-benar berubah arah. Enrollment/verifikasi membutuhkan face-service aktif (default `http://127.0.0.1:8001`).
 - Tantangan check-in kini diverifikasi dari gambar: yaw wajah dibandingkan dengan baseline pendaftaran, sehingga `face_challenge_response` dari klien tidak lagi menentukan hasil. Data lama yang belum memiliki baseline yaw harus didaftar ulang agar check-in dapat diverifikasi.
-- Batasan: pendeteksian masih memakai satu frame pada saat pengambilan foto; verifikasi multi-frame/video belum diimplementasikan.
+- Check-in wajah kini mengirim dua frame: `face_front_image` (wajah menghadap kamera, dipakai untuk pencocokan identitas) dan `face_image` (wajah menoleh, dipakai untuk liveness yaw). `face-front-image` bersifat wajib bila verifikasi wajah aktif; klien lama tanpa field ini ditolak dengan `face: front image not provided`.
+- Batasan: pendeteksian memakai dua frame foto diam, bukan video; gerakan toleh hanya diverifikasi dari perbedaan yaw antara frame depan dan frame tolehan pada face-service.
 
 ## Fase 9
 

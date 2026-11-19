@@ -21,6 +21,7 @@ class CheckInRequest extends FormRequest
             'gps_timestamp' => ['required', 'date'],
             'gps_is_mock' => ['required', 'boolean'],
             'face_image' => ['nullable', 'string'],
+            'face_front_image' => ['nullable', 'string'],
             'face_challenge' => ['nullable', 'string', 'in:blink,turn_left,turn_right,turn'],
             'face_challenge_response' => ['nullable', 'array'],
         ];

@@ -17,6 +17,7 @@ router = APIRouter(prefix="/verify", tags=["verification"])
 class VerifyRequest(BaseModel):
     user_id: int
     image: str
+    front_image: Optional[str] = None
     challenge_type: Optional[str] = None
     challenge_response: Optional[dict] = None
 
@@ -29,34 +30,61 @@ class VerifyResponse(BaseModel):
     inconclusive: bool = False
 
 
-@router.post("", response_model=VerifyResponse)
-def verify(req: VerifyRequest):
+def _decode_image(value: str) -> Image.Image:
     try:
-        img_bytes = base64.b64decode(req.image)
-        image = ImageOps.exif_transpose(Image.open(io.BytesIO(img_bytes))).convert("RGB")
+        img_bytes = base64.b64decode(value)
+        return ImageOps.exif_transpose(Image.open(io.BytesIO(img_bytes))).convert("RGB")
     except Exception:
         raise HTTPException(400, "Invalid image")
+
+
+@router.post("", response_model=VerifyResponse)
+def verify(req: VerifyRequest):
+    image = _decode_image(req.image)
+    front_image = _decode_image(req.front_image) if req.front_image else image
 
     stored = embedding_store.get(req.user_id)
     if stored is None:
         raise HTTPException(404, "User not enrolled")
 
-    max_yaw = (
-        settings.MAX_TURN_YAW_DEGREES
-        if req.challenge_type == "turn"
-        else settings.MAX_YAW_DEGREES
-    )
-    quality = face_engine.check_quality(image, max_yaw_degrees=max_yaw)
-    if not quality["ok"]:
-        return VerifyResponse(
-            match=False,
-            score=0.0,
-            liveness_passed=False,
-            reason=quality["reason"],
+    if req.front_image:
+        quality = face_engine.check_quality(
+            front_image, max_yaw_degrees=settings.MAX_YAW_DEGREES
         )
+        if not quality["ok"]:
+            return VerifyResponse(
+                match=False,
+                score=0.0,
+                liveness_passed=False,
+                reason=quality["reason"],
+            )
+        turn_quality = face_engine.check_quality(
+            image, max_yaw_degrees=settings.MAX_TURN_YAW_DEGREES
+        )
+        if not turn_quality["ok"]:
+            return VerifyResponse(
+                match=False,
+                score=0.0,
+                liveness_passed=False,
+                reason=turn_quality["reason"],
+            )
+    else:
+        max_yaw = (
+            settings.MAX_TURN_YAW_DEGREES
+            if req.challenge_type == "turn"
+            else settings.MAX_YAW_DEGREES
+        )
+        quality = face_engine.check_quality(image, max_yaw_degrees=max_yaw)
+        if not quality["ok"]:
+            return VerifyResponse(
+                match=False,
+                score=0.0,
+                liveness_passed=False,
+                reason=quality["reason"],
+            )
 
     try:
-        embedding = face_engine.extract_embedding(image)
+        embedding = face_engine.extract_embedding(front_image)
     except FaceQualityError as error:
         return VerifyResponse(
             match=False,

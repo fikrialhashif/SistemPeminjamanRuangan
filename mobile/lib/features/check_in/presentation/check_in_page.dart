@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -5,6 +6,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -12,9 +14,12 @@ import '../../../core/network/api_error.dart';
 import '../../../core/permissions/app_permissions.dart';
 import '../../../core/widgets/camera_preview_box.dart';
 import '../../bookings/presentation/booking_providers.dart';
+import '../../face/data/face_guidance.dart';
 import '../../face/data/face_repository.dart';
 import '../data/check_in_repository.dart';
 import '../data/location_service.dart';
+
+enum _FaceCaptureKind { front, turn }
 
 class CheckInPage extends ConsumerStatefulWidget {
   const CheckInPage({required this.bookingId, super.key});
@@ -26,6 +31,8 @@ class CheckInPage extends ConsumerStatefulWidget {
 
 class _CheckInPageState extends ConsumerState<CheckInPage> {
   static const _steps = ['Lokasi', 'QR', 'Wajah'];
+  static const _maxAutoCaptureAttempts = 2;
+  static const _frameSampling = 3;
 
   int step = 0;
   LocationEvidence? location;
@@ -43,12 +50,30 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
   bool faceStatusReady = false;
   Map<String, dynamic>? challenge;
   CameraController? camera;
+  Uint8List? frontFrame;
   Uint8List? faceFrame;
+  FaceDetector? _faceDetector;
+  final FaceGuidanceTracker _guidance = FaceGuidanceTracker();
+  bool _faceDetected = false;
+  double? _faceYaw;
+  int _frameCounter = 0;
+  bool _processingFrame = false;
+  bool _capturingFrame = false;
+  int _autoCaptureAttempts = 0;
 
   bool get faceRequired => faceEnabled;
 
+  String get _detectionStatus {
+    if (submitting) return 'Mengirim...';
+    if (!_faceDetected) return 'Mencari wajah...';
+    return 'Wajah terdeteksi, pertahankan sebentar.';
+  }
+
   @override
   void dispose() {
+    unawaited(_stopFaceDetection());
+    unawaited(_faceDetector?.close() ?? Future<void>.value());
+    frontFrame = null;
     faceFrame = null;
     camera?.dispose();
     super.dispose();
@@ -176,7 +201,7 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
       key: const ValueKey('face-step'),
       icon: Icons.face_retouching_natural,
       title: 'Langkah 3 - Verifikasi wajah',
-      description: 'Server akan meminta Anda menoleh kiri atau kanan. Lakukan gerakan tersebut, lalu ambil foto wajah Anda. Foto yang tidak sesuai data wajah akan ditolak.',
+      description: 'Foto depan diambil otomatis saat wajah terdeteksi, lalu foto toleh diambil saat kepala berputar. Check-in langsung dikirim setelah kedua foto selesai.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -199,6 +224,18 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
               label: const Text('Coba lagi'),
             ),
           ],
+          if (faceEnabled &&
+              faceEnrolled &&
+              accepted == false &&
+              message != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: OutlinedButton.icon(
+                onPressed: submitting ? null : _retryFaceCapture,
+                icon: const Icon(Icons.face_retouching_natural),
+                label: const Text('Ulangi verifikasi wajah'),
+              ),
+            ),
           if (faceEnabled && !faceEnrolled && !faceStatusLoading)
             _EnrollmentPrompt(onEnroll: _openEnrollment),
           if (faceEnabled && faceEnrolled) ...[
@@ -208,6 +245,20 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
                 message:
                     'Gerakan diminta: ${faceChallengeInstruction(challenge!['challenge_type']?.toString())}.',
               ),
+            if (camera?.value.isInitialized == true)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    frontFrame == null
+                        ? 'Hadapkan wajah ke kamera. $_detectionStatus'
+                        : faceFrame == null
+                        ? 'Foto depan tersimpan. Sekarang tolehkan kepala ke kiri atau kanan. $_detectionStatus'
+                        : 'Foto depan dan tolehan tersimpan. Mengirim check-in...',
+                  ),
+                ),
+              ),
             const SizedBox(height: 12),
             if (camera?.value.isInitialized == true)
               SizedBox(
@@ -216,22 +267,28 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
                 child: CameraPreviewBox(controller: camera!, borderRadius: 12),
               ),
             const SizedBox(height: 12),
-            if (faceFrame == null)
-              FilledButton.icon(
-                onPressed: camera == null ? null : _captureFace,
-                icon: const Icon(Icons.camera_alt),
-                label: const Text('Ambil foto wajah'),
-              )
-            else
+            if (camera?.value.isInitialized == true && faceFrame == null)
               Row(
                 children: [
-                  const Icon(Icons.check_circle, color: Colors.green),
-                  const SizedBox(width: 8),
-                  const Expanded(child: Text('Foto wajah siap dikirim.')),
-                  TextButton(
-                    onPressed: () => setState(() => faceFrame = null),
-                    child: const Text('Ulangi'),
+                  Icon(
+                    frontFrame == null
+                        ? Icons.face_retouching_natural
+                        : Icons.turn_right,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      frontFrame == null
+                          ? 'Menunggu wajah menghadap kamera...'
+                          : 'Menunggu kepala menoleh...',
+                    ),
+                  ),
+                  if (submitting)
+                    const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
                 ],
               ),
           ],
@@ -248,7 +305,8 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
         location != null &&
             qrToken != null &&
             faceStatusReady &&
-            (!faceRequired || (faceEnrolled && faceFrame != null)),
+            (!faceRequired ||
+                (faceEnrolled && frontFrame != null && faceFrame != null)),
     };
 
     return Row(
@@ -264,9 +322,19 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
             onPressed: canContinue ? _nextStep : null,
             child: const Text('Lanjut'),
           )
+        else if (faceRequired && faceEnrolled)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Text(
+              submitting
+                  ? 'Mengirim check-in...'
+                  : 'Check-in otomatis setelah dua foto selesai',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          )
         else
           FilledButton.icon(
-            onPressed: canContinue && !submitting ? _submit : null,
+            onPressed: canContinue && !submitting ? () => _submit() : null,
             icon: submitting
                 ? const SizedBox.square(
                     dimension: 18,
@@ -319,9 +387,11 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
 
   void _goBack() {
     if (step == 2) {
+      unawaited(_stopFaceDetection());
       final controller = camera;
       setState(() {
         camera = null;
+        frontFrame = null;
         faceFrame = null;
         challenge = null;
         faceStatusReady = false;
@@ -366,11 +436,14 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
   }
 
   Future<void> _prepareFaceStep() async {
+    await _stopFaceDetection();
     setState(() {
       faceStatusLoading = true;
       faceStatusReady = false;
       faceError = null;
+      frontFrame = null;
       faceFrame = null;
+      _autoCaptureAttempts = 0;
     });
     try {
       final faceRepository = ref.read(faceRepositoryProvider);
@@ -430,7 +503,7 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
         selected,
         ResolutionPreset.medium,
         enableAudio: false,
-        imageFormatGroup: ImageFormatGroup.jpeg,
+        imageFormatGroup: cameraImageFormatGroup(),
       );
       await controller.initialize();
       if (!mounted || step != 2) {
@@ -438,6 +511,14 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
         return;
       }
       setState(() => camera = controller);
+      _faceDetector ??= FaceDetector(
+        options: FaceDetectorOptions(
+          enableTracking: true,
+          performanceMode: FaceDetectorMode.accurate,
+          minFaceSize: 0.15,
+        ),
+      );
+      await _startFaceDetection();
     } catch (error) {
       if (!mounted) return;
       setState(() => faceError = apiErrorMessage(error));
@@ -460,30 +541,176 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
     }
   }
 
-  Future<void> _captureFace() async {
+  Future<void> _retryFaceCapture() async {
+    await _stopFaceDetection();
+    setState(() {
+      frontFrame = null;
+      faceFrame = null;
+      faceError = null;
+      message = null;
+      accepted = null;
+      _autoCaptureAttempts = 0;
+      _faceDetected = false;
+      _faceYaw = null;
+      _guidance.reset();
+    });
+    await _renewChallenge();
+    unawaited(_startFaceDetection());
+  }
+
+  Future<void> _startFaceDetection({bool resetGuidance = true}) async {
     final controller = camera;
-    if (controller == null) return;
+    if (step != 2 ||
+        !faceEnabled ||
+        !faceEnrolled ||
+        controller == null ||
+        !controller.value.isInitialized ||
+        faceFrame != null ||
+        submitting ||
+        _capturingFrame ||
+        _autoCaptureAttempts >= _maxAutoCaptureAttempts) {
+      return;
+    }
+    await _stopFaceDetection();
+    if (resetGuidance) {
+      _guidance.reset();
+      _faceDetected = false;
+      _faceYaw = null;
+    }
+    _frameCounter = 0;
+    _processingFrame = false;
+    if (!controller.value.isStreamingImages) {
+      await controller.startImageStream(_onCameraImage);
+    }
+  }
+
+  Future<void> _stopFaceDetection() async {
+    final controller = camera;
+    if (controller != null && controller.value.isStreamingImages) {
+      await controller.stopImageStream();
+    }
+  }
+
+  Future<void> _onCameraImage(CameraImage image) async {
+    if (!mounted ||
+        step != 2 ||
+        _processingFrame ||
+        _capturingFrame ||
+        faceFrame != null ||
+        submitting) {
+      return;
+    }
+    _frameCounter += 1;
+    if (_frameCounter % _frameSampling != 0) return;
+    _processingFrame = true;
+    try {
+      final detector = _faceDetector;
+      final controller = camera;
+      if (detector == null || controller == null) return;
+      final inputImage = inputImageFromCameraImage(image, controller);
+      if (inputImage == null) return;
+      final faces = await detector.processImage(inputImage);
+      if (!mounted ||
+          step != 2 ||
+          faceFrame != null ||
+          submitting ||
+          !controller.value.isStreamingImages) {
+        return;
+      }
+      final face = faces.isEmpty
+          ? null
+          : faces.reduce(
+              (a, b) => a.boundingBox.width >= b.boundingBox.width ? a : b,
+            );
+      final detected = face != null;
+      final yaw = face?.headEulerAngleY;
+      final action = _guidance.update(faceDetected: detected, yaw: yaw);
+      if (detected != _faceDetected || yaw != _faceYaw) {
+        setState(() {
+          _faceDetected = detected;
+          _faceYaw = yaw;
+        });
+      }
+      if (action == FaceGuidanceAction.captureFront ||
+          action == FaceGuidanceAction.captureTurn) {
+        await _stopFaceDetection();
+        unawaited(
+          _captureFace(
+            kind: action == FaceGuidanceAction.captureFront
+                ? _FaceCaptureKind.front
+                : _FaceCaptureKind.turn,
+          ),
+        );
+      }
+    } catch (_) {
+      return;
+    } finally {
+      _processingFrame = false;
+    }
+  }
+
+  Future<void> _captureFace({required _FaceCaptureKind kind}) async {
+    final controller = camera;
+    if (controller == null || _capturingFrame) return;
+    await _stopFaceDetection();
+    setState(() => _capturingFrame = true);
+    if (kind == _FaceCaptureKind.front) _autoCaptureAttempts += 1;
+    var restartResetGuidance = true;
     try {
       final frame = await ref.read(faceRepositoryProvider).capture(controller);
       if (!mounted) return;
-      setState(() {
-        faceFrame = frame;
-        faceError = null;
-        message = null;
-      });
+      if (kind == _FaceCaptureKind.front) {
+        setState(() {
+          frontFrame = frame;
+          faceError = null;
+          message = null;
+          accepted = null;
+          _capturingFrame = false;
+        });
+        _guidance.markFrontCaptured();
+        restartResetGuidance = false;
+      } else {
+        setState(() {
+          faceFrame = frame;
+          faceError = null;
+          message = null;
+          accepted = null;
+          _capturingFrame = false;
+        });
+        await _submit(autoFromCapture: true);
+        return;
+      }
     } catch (error) {
       if (!mounted) return;
-      setState(() => faceError = apiErrorMessage(error));
+      setState(() {
+        faceError = apiErrorMessage(error);
+        _capturingFrame = false;
+      });
+    } finally {
+      if (mounted && _capturingFrame) {
+        setState(() => _capturingFrame = false);
+      }
+    }
+    if (mounted &&
+        faceFrame == null &&
+        _autoCaptureAttempts < _maxAutoCaptureAttempts) {
+      unawaited(_startFaceDetection(resetGuidance: restartResetGuidance));
     }
   }
 
   Future<void> _openEnrollment() async {
-    await context.push('/face/enrollment');
+    await _stopFaceDetection();
+    if (!mounted) return;
+    final router = GoRouter.of(context);
+    await router.push('/face/enrollment');
     if (mounted) await _prepareFaceStep();
   }
 
-  Future<void> _submit() async {
-    if (location == null || qrToken == null || !faceStatusReady) return;
+  Future<void> _submit({bool autoFromCapture = false}) async {
+    if (submitting || location == null || qrToken == null || !faceStatusReady) {
+      return;
+    }
+    await _stopFaceDetection();
     if (faceRequired && !faceEnrolled) {
       setState(() {
         accepted = false;
@@ -491,10 +718,10 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
       });
       return;
     }
-    if (faceRequired && faceFrame == null) {
+    if (faceRequired && (frontFrame == null || faceFrame == null)) {
       setState(() {
         accepted = false;
-        message = 'Ambil foto wajah terlebih dahulu.';
+        message = 'Foto depan dan tolehan belum lengkap.';
       });
       return;
     }
@@ -505,6 +732,7 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
     });
 
     final challengeType = challenge?['challenge_type']?.toString();
+    var retryAuto = false;
     try {
       final result = await ref
           .read(checkInRepositoryProvider)
@@ -515,6 +743,9 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
             faceImageBase64: faceFrame == null
                 ? null
                 : base64Encode(faceFrame!),
+            faceFrontImageBase64: frontFrame == null
+                ? null
+                : base64Encode(frontFrame!),
             faceChallenge: challengeType,
             faceChallengeResponse: challengeType == null
                 ? null
@@ -524,10 +755,19 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
           result['result']?.toString() ?? result['status']?.toString();
       final isAccepted = state == 'accepted';
       if (!mounted) return;
+      final rejectionReasons = result['rejection_reasons'];
+      final hasFaceReason =
+          rejectionReasons is List &&
+          rejectionReasons.any(
+            (reason) => reason.toString().toLowerCase().contains('face'),
+          );
       setState(() {
         accepted = isAccepted;
         message = checkInDecisionMessage(result);
-        if (!isAccepted) faceFrame = null;
+        if (!isAccepted) {
+          frontFrame = null;
+          faceFrame = null;
+        }
       });
 
       if (isAccepted) {
@@ -541,6 +781,12 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
       }
 
       if (faceEnabled) await _renewChallenge();
+      retryAuto =
+          autoFromCapture &&
+          faceEnabled &&
+          hasFaceReason &&
+          !isFaceIdentityMismatch(result) &&
+          _autoCaptureAttempts < _maxAutoCaptureAttempts;
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -548,7 +794,10 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
         message = apiErrorMessage(error);
       });
     } finally {
-      if (mounted) setState(() => submitting = false);
+      if (mounted) {
+        setState(() => submitting = false);
+        if (retryAuto) unawaited(_startFaceDetection());
+      }
     }
   }
 }

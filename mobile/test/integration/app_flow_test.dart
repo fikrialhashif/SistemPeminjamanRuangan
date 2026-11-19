@@ -91,13 +91,15 @@ void main() {
           bookingId: '9',
           qrToken: 'signed-qr-token',
           location: location,
-          faceImageBase64: base64Encode(Uint8List.fromList([1, 2, 3])),
+          faceImageBase64: base64Encode(Uint8List.fromList([4, 5, 6])),
+          faceFrontImageBase64: base64Encode(Uint8List.fromList([1, 2, 3])),
           faceChallenge: challenge['challenge_type'] as String,
           faceChallengeResponse: {'action': challenge['challenge_type']},
         );
     expect(faceAttempt['result'], 'accepted');
     final faceBody = backend.lastJsonBody('/bookings/9/check-in')!;
     expect(faceBody['face_image'], isNotNull);
+    expect(faceBody['face_front_image'], isNotNull);
     expect(faceBody['face_challenge'], 'turn');
     expect(faceBody['face_challenge_response'], {'action': 'turn'});
 
