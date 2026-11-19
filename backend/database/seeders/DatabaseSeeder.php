@@ -64,7 +64,7 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Ruang Rapat A1'],
             ['type' => ResourceType::ROOM, 'location_id' => $locations[0]->id, 'category' => 'meeting_room', 'is_active' => true],
         );
-        $room1->room()->firstOrCreate(['resource_id' => $room1->id], ['capacity' => 20, 'facilities' => json_encode(['projector', 'whiteboard', 'ac'])]);
+        $room1->room()->firstOrCreate(['resource_id' => $room1->id], ['capacity' => 20, 'facilities' => ['projector', 'whiteboard', 'ac']]);
         $room1->rules()->firstOrCreate(['resource_id' => $room1->id], [
             'buffer_minutes' => 15,
             'min_duration_minutes' => 30,
@@ -78,7 +78,7 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Lab Komputer B2'],
             ['type' => ResourceType::ROOM, 'location_id' => $locations[1]->id, 'category' => 'lab', 'is_active' => true],
         );
-        $room2->room()->firstOrCreate(['resource_id' => $room2->id], ['capacity' => 40, 'facilities' => json_encode(['computers', 'projector', 'ac'])]);
+        $room2->room()->firstOrCreate(['resource_id' => $room2->id], ['capacity' => 40, 'facilities' => ['computers', 'projector', 'ac']]);
         $room2->rules()->firstOrCreate(['resource_id' => $room2->id], [
             'buffer_minutes' => 10,
             'min_duration_minutes' => 60,
@@ -127,5 +127,7 @@ class DatabaseSeeder extends Seeder
         Setting::set('strike_threshold', 3, 'integer');
         Setting::set('suspension_duration_days', 7, 'integer');
         Setting::set('waitlist_offer_minutes', 30, 'integer');
+
+        $this->call(WorkflowDummySeeder::class);
     }
 }

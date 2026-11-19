@@ -4,7 +4,12 @@
     $asset = $resource?->asset;
     $rule = $resource?->rules;
     $typeValue = old('type', $resource?->type?->value ?? 'room');
-    $facilitiesValue = old('facilities_text', $room?->facilities ? implode(', ', $room->facilities) : '');
+    $facilities = $room?->facilities;
+    if (is_string($facilities)) {
+        $decoded = json_decode($facilities, true);
+        $facilities = is_array($decoded) ? $decoded : array_filter(array_map('trim', explode(',', $facilities)));
+    }
+    $facilitiesValue = old('facilities_text', $facilities ? implode(', ', (array) $facilities) : '');
     $timeValue = fn ($value) => $value ? substr($value, 0, 5) : '';
 @endphp
 

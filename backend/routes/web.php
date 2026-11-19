@@ -47,6 +47,7 @@ Route::prefix('admin')->group(function () {
         Route::post('suspensions', [AdminManagementController::class, 'storeSuspension'])->name('admin.suspensions.store');
         Route::post('suspensions/{suspension}/end', [AdminManagementController::class, 'endSuspension'])->name('admin.suspensions.end');
 
+        Route::get('bookings', [AdminManagementController::class, 'bookings'])->name('admin.bookings');
         Route::get('loans', [AdminManagementController::class, 'loans'])->name('admin.loans');
         Route::post('loans/{loan}/handover', [AdminManagementController::class, 'handoverLoan'])->name('admin.loans.handover');
         Route::post('loans/{loan}/return', [AdminManagementController::class, 'returnLoan'])->name('admin.loans.return');
