@@ -18,7 +18,7 @@ class Resource extends Model
         'name',
         'type',
         'location_id',
-        'category',
+        'category_id',
         'description',
         'is_active',
     ];
@@ -34,6 +34,11 @@ class Resource extends Model
     public function location(): BelongsTo
     {
         return $this->belongsTo(Location::class);
+    }
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(Category::class);
     }
 
     public function room(): HasOne

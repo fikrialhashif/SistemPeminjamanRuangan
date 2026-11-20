@@ -1,29 +1,29 @@
 @extends('admin.layout')
 
-@section('title', 'Strike & suspensi')
+@section('title', 'Pelanggaran & pembatasan akun')
 
 @section('content')
     <header class="plate">
         <div>
-            <h1 class="plate-title">Strike &amp; suspensi</h1>
-            <p class="plate-desc">Catat pelanggaran, batalkan strike, dan kelola pembatasan akun pengguna.</p>
+            <h1 class="plate-title">Pelanggaran &amp; pembatasan akun</h1>
+            <p class="plate-desc">Catat pelanggaran, batalkan catatan pelanggaran, dan kelola pembatasan akun pengguna.</p>
         </div>
         <div class="plate-aside">
-            <button type="button" class="btn btn--onplate" data-open-dialog="createStrike">Catat strike</button>
-            <button type="button" class="btn btn--onplate" data-open-dialog="createSuspension">Buat suspensi</button>
+            <button type="button" class="btn btn--onplate" data-open-dialog="createStrike">Catat pelanggaran</button>
+            <button type="button" class="btn btn--onplate" data-open-dialog="createSuspension">Batasi akun</button>
         </div>
     </header>
 
     <div class="stack">
         <section class="panel">
             <div class="panel-head">
-                <h2 class="panel-title">Riwayat strike</h2>
+                <h2 class="panel-title">Riwayat pelanggaran</h2>
                 <span class="tag">{{ number_format($strikes->total(), 0, ',', '.') }}</span>
             </div>
             @if($strikes->isEmpty())
                 <div class="empty">
-                    <p class="empty-title">Belum ada strike.</p>
-                    <p>Strike bisa dicatat manual dari halaman ini atau otomatis dari check-in gagal.</p>
+                    <p class="empty-title">Belum ada pelanggaran.</p>
+                    <p>Pelanggaran bisa dicatat manual dari halaman ini atau otomatis saat verifikasi kehadiran gagal.</p>
                 </div>
             @else
                 <div class="table-wrap">
@@ -86,13 +86,13 @@
 
         <section class="panel">
             <div class="panel-head">
-                <h2 class="panel-title">Suspensi</h2>
+                <h2 class="panel-title">Pembatasan akun</h2>
                 <span class="tag">{{ number_format($suspensions->total(), 0, ',', '.') }}</span>
             </div>
             @if($suspensions->isEmpty())
                 <div class="empty">
-                    <p class="empty-title">Belum ada suspensi.</p>
-                    <p>Suspensi otomatis dibuat saat jumlah strike melewati ambang.</p>
+                    <p class="empty-title">Belum ada pembatasan akun.</p>
+                    <p>Pembatasan akun otomatis dibuat saat jumlah pelanggaran melewati batas.</p>
                 </div>
             @else
                 <div class="table-wrap">
@@ -126,7 +126,7 @@
                                     </td>
                                     <td data-label="Aksi" class="data-actions">
                                         @if($suspension->ends_at->isFuture())
-                                            <form method="POST" action="{{ route('admin.suspensions.end', $suspension) }}" data-confirm="Akhiri suspensi {{ $suspension->user->name ?? '' }} sekarang?">
+                                            <form method="POST" action="{{ route('admin.suspensions.end', $suspension) }}" data-confirm="Akhiri pembatasan akun {{ $suspension->user->name ?? '' }} sekarang?">
                                                 @csrf
                                                 <button type="submit" class="btn btn--ghost btn--sm">Akhiri</button>
                                             </form>
@@ -148,8 +148,8 @@
     <dialog id="createStrike" class="modal" aria-labelledby="createStrikeTitle">
         <div class="modal-head">
             <div>
-                <h2 class="modal-title" id="createStrikeTitle">Catat strike</h2>
-                <p class="modal-desc">Strike otomatis memicu suspensi jika melewati ambang di pengaturan.</p>
+                <h2 class="modal-title" id="createStrikeTitle">Catat pelanggaran</h2>
+                <p class="modal-desc">Pelanggaran otomatis memicu pembatasan akun jika melewati batas di pengaturan.</p>
             </div>
             <button type="button" class="modal-close" data-close-dialog aria-label="Tutup dialog">&times;</button>
         </div>
@@ -168,12 +168,12 @@
                     </div>
                     <div class="field field--wide">
                         <label class="field-label" for="strike_reason">Alasan</label>
-                        <input class="input" type="text" id="strike_reason" name="reason" value="{{ old('reason') }}" placeholder="Contoh: Tidak check-in tanpa kabar" required>
+                        <input class="input" type="text" id="strike_reason" name="reason" value="{{ old('reason') }}" placeholder="Contoh: Tidak melakukan verifikasi tanpa kabar" required>
                     </div>
                 </div>
                 <div class="form-actions">
                     <button type="button" class="btn btn--ghost" data-close-dialog>Batal</button>
-                    <button type="submit" class="btn btn--primary">Simpan strike</button>
+                    <button type="submit" class="btn btn--primary">Simpan pelanggaran</button>
                 </div>
             </form>
         </div>
@@ -182,8 +182,8 @@
     <dialog id="createSuspension" class="modal" aria-labelledby="createSuspensionTitle">
         <div class="modal-head">
             <div>
-                <h2 class="modal-title" id="createSuspensionTitle">Buat suspensi</h2>
-                <p class="modal-desc">Pengguna tidak bisa membuat booking selama masa suspensi.</p>
+                <h2 class="modal-title" id="createSuspensionTitle">Batasi akun</h2>
+                <p class="modal-desc">Pengguna tidak bisa meminjam selama masa pembatasan akun.</p>
             </div>
             <button type="button" class="modal-close" data-close-dialog aria-label="Tutup dialog">&times;</button>
         </div>
@@ -210,12 +210,12 @@
                     </div>
                     <div class="field field--wide">
                         <label class="field-label" for="suspension_reason">Alasan</label>
-                        <textarea class="input" id="suspension_reason" name="reason" rows="3" placeholder="Alasan suspensi">{{ old('reason') }}</textarea>
+                        <textarea class="input" id="suspension_reason" name="reason" rows="3" placeholder="Alasan pembatasan akun">{{ old('reason') }}</textarea>
                     </div>
                 </div>
                 <div class="form-actions">
                     <button type="button" class="btn btn--ghost" data-close-dialog>Batal</button>
-                    <button type="submit" class="btn btn--primary">Simpan suspensi</button>
+                    <button type="submit" class="btn btn--primary">Simpan pembatasan</button>
                 </div>
             </form>
         </div>

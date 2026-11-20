@@ -30,9 +30,9 @@
                         <tr>
                             <th scope="col">Permintaan</th>
                             <th scope="col">Pemohon</th>
-                            <th scope="col">Ruangan / aset</th>
+                            <th scope="col">Ruangan atau aset</th>
                             <th scope="col">Jadwal</th>
-                            <th scope="col">Tingkat</th>
+                            <th scope="col">Tahap</th>
                             <th scope="col">Batas waktu</th>
                             <th scope="col">Keputusan</th>
                         </tr>
@@ -50,7 +50,7 @@
                                         <span>{{ $approval->booking->user->name ?? 'Tidak dikenal' }}</span>
                                     </div>
                                 </td>
-                                <td data-label="Ruangan / aset">{{ $approval->booking->resource->name ?? 'Tidak dikenal' }}</td>
+                                <td data-label="Ruangan atau aset">{{ $approval->booking->resource->name ?? 'Tidak dikenal' }}</td>
                                 <td data-label="Jadwal">
                                     @if($approval->booking?->starts_at)
                                         <div class="cell-time">
@@ -61,7 +61,7 @@
                                         <span class="cell-muted">&mdash;</span>
                                     @endif
                                 </td>
-                                <td data-label="Tingkat"><span class="tag tag--plain">Tahap {{ $approval->level }}</span></td>
+                                <td data-label="Tahap"><span class="tag tag--plain">Tahap {{ $approval->level }}</span></td>
                                 <td data-label="Batas waktu">
                                     @if($approval->expires_at)
                                         <div class="cell-time {{ $approval->expires_at->isPast() ? 'overdue' : '' }}">
@@ -76,12 +76,12 @@
                                     @if($canDecide)
                                         <form method="POST" action="{{ route('admin.approvals.approve', $approval) }}" class="decide">
                                             @csrf
-                                            <input type="text" name="notes" class="input" placeholder="Catatan (opsional)" aria-label="Catatan untuk permintaan {{ $approval->booking->title ?? '#'.$approval->booking_id }}">
+                                            <input type="text" name="notes" class="input" placeholder="Catatan (boleh kosong)" aria-label="Catatan untuk permintaan {{ $approval->booking->title ?? '#'.$approval->booking_id }}">
                                             <button type="submit" class="btn btn--primary btn--sm">Setujui</button>
                                             <button type="submit" formaction="{{ route('admin.approvals.reject', $approval) }}" class="btn btn--reject btn--sm">Tolak</button>
                                         </form>
                                     @else
-                                        <span class="cell-muted">Hanya approver yang dapat memutuskan.</span>
+                                        <span class="cell-muted">Hanya penyetuju yang dapat memutuskan.</span>
                                     @endif
                                 </td>
                             </tr>

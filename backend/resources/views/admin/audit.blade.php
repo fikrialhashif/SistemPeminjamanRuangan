@@ -3,6 +3,30 @@
 @section('title', 'Riwayat aktivitas')
 
 @section('content')
+    @php
+        $actionLabels = [
+            'created' => 'Dibuat',
+            'updated' => 'Diperbarui',
+            'deleted' => 'Dihapus',
+            'approved' => 'Disetujui',
+            'rejected' => 'Ditolak',
+            'checked_in' => 'Verifikasi kehadiran',
+            'login' => 'Masuk',
+        ];
+        $objectLabels = [
+            'Booking' => 'Peminjaman',
+            'AssetLoan' => 'Peminjaman aset',
+            'Resource' => 'Ruangan atau aset',
+            'User' => 'Pengguna',
+            'Location' => 'Lokasi',
+            'Category' => 'Kategori',
+            'Facility' => 'Fasilitas',
+            'Strike' => 'Pelanggaran',
+            'Suspension' => 'Pembatasan akun',
+            'Approval' => 'Persetujuan',
+        ];
+    @endphp
+
     <header class="plate">
         <div>
             <h1 class="plate-title">Riwayat aktivitas</h1>
@@ -27,7 +51,7 @@
                 <select class="input" id="audit_action" name="action">
                     <option value="">Semua aksi</option>
                     @foreach($actions as $action)
-                        <option value="{{ $action }}" @selected(request('action') === $action)>{{ ucfirst(str_replace('_', ' ', $action)) }}</option>
+                        <option value="{{ $action }}" @selected(request('action') === $action)>{{ $actionLabels[$action] ?? 'Aksi lain' }}</option>
                     @endforeach
                 </select>
             </div>
@@ -50,7 +74,7 @@
             </div>
             <div class="filter-actions">
                 <button type="submit" class="btn btn--primary">Terapkan</button>
-                <a class="btn btn--ghost" href="{{ route('admin.audit') }}">Reset</a>
+                <a class="btn btn--ghost" href="{{ route('admin.audit') }}">Atur ulang</a>
             </div>
         </div>
     </form>
@@ -77,16 +101,10 @@
                     <tbody>
                         @foreach($logs as $log)
                             @php
-                                $actionLabel = match ($log->action) {
-                                    'created' => 'Dibuat',
-                                    'updated' => 'Diperbarui',
-                                    'deleted' => 'Dihapus',
-                                    'approved' => 'Disetujui',
-                                    'rejected' => 'Ditolak',
-                                    'checked_in' => 'Check-in',
-                                    'login' => 'Masuk',
-                                    default => ucfirst(str_replace('_', ' ', $log->action)),
-                                };
+                                $actionLabel = $actionLabels[$log->action] ?? 'Aksi lain';
+                                $objectLabel = $log->auditable_type
+                                    ? ($objectLabels[class_basename($log->auditable_type)] ?? 'Data lain')
+                                    : 'Data lain';
                             @endphp
                             <tr>
                                 <td data-label="Waktu">
@@ -104,7 +122,7 @@
                                 <td data-label="Aksi">{{ $actionLabel }}</td>
                                 <td data-label="Objek">
                                     @if($log->auditable_type)
-                                        {{ class_basename($log->auditable_type) }} #{{ $log->auditable_id }}
+                                        {{ $objectLabel }} #{{ $log->auditable_id }}
                                     @else
                                         <span class="cell-muted">&mdash;</span>
                                     @endif

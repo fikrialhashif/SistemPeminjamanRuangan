@@ -6,7 +6,7 @@
     <header class="plate">
         <div>
             <h1 class="plate-title">Pengaturan sistem</h1>
-            <p class="plate-desc">Nilai ini dipakai langsung oleh validasi check-in, approval, waitlist, dan penalti.</p>
+            <p class="plate-desc">Nilai ini dipakai untuk pemeriksaan saat masuk, persetujuan, antrean, dan pelanggaran.</p>
         </div>
     </header>
 

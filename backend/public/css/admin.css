@@ -188,6 +188,49 @@ button {
     opacity: 0.9;
 }
 
+.nav-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.nav-toggle {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.nav-chevron {
+    width: 16px;
+    height: 16px;
+    margin-left: auto;
+    flex-shrink: 0;
+    opacity: 0.7;
+    transition: transform 140ms ease;
+}
+
+.nav-toggle[aria-expanded='true'] .nav-chevron {
+    transform: rotate(180deg);
+}
+
+.nav-sub {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 2px 0 6px 30px;
+}
+
+.nav-sub[hidden] {
+    display: none;
+}
+
+.nav-link--sub {
+    padding: 8px 10px;
+    font-size: 13.5px;
+}
+
 .rail-foot {
     display: flex;
     flex-direction: column;
@@ -1352,6 +1395,39 @@ a.pager-link:hover {
     display: block;
 }
 
+.check-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 6px 10px;
+    padding: 12px;
+    border: 1px solid var(--line-strong);
+    border-radius: 4px;
+    background: var(--paper);
+}
+
+.check--inline {
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 140ms ease;
+}
+
+.check--inline:hover {
+    background: var(--line);
+}
+
+.check--inline input[type='checkbox'] {
+    margin-top: 0;
+}
+
+.check--inline .field-label {
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 500;
+}
+
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1641,6 +1717,14 @@ a.pager-link:hover {
 
     .nav-glyph {
         display: none;
+    }
+
+    .nav-sub {
+        margin-left: 0;
+    }
+
+    .nav-chevron {
+        margin-left: 6px;
     }
 
     .rail-foot {

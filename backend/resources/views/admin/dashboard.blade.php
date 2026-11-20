@@ -39,7 +39,7 @@
         <div class="board-cell">
             <span class="board-label">Catatan pelanggaran</span>
             <span class="board-value">{{ number_format($totalStrikes, 0, ',', '.') }}</span>
-            <span class="board-note">Strike tercatat</span>
+            <span class="board-note">Pelanggaran tercatat</span>
         </div>
     </section>
 

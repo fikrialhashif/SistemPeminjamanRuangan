@@ -7,6 +7,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Approval;
 use App\Models\AuditLog;
 use App\Models\Booking;
+use App\Models\Category;
+use App\Models\Facility;
 use App\Models\Location;
 use App\Models\Resource;
 use App\Models\Strike;
@@ -121,17 +123,20 @@ class AdminController extends Controller
 
     private function ensureCanDecideApprovals(Request $request): void
     {
-        abort_unless($this->canDecideApprovals($request), 403, 'Hanya approver yang bisa memutuskan permintaan.');
+        abort_unless($this->canDecideApprovals($request), 403, 'Hanya penyetuju yang bisa memutuskan permintaan.');
     }
 
     public function resources()
     {
         $this->ensureCanManageResources();
 
-        $resources = Resource::with(['location', 'room', 'asset'])->latest()->paginate(20);
+        $resources = Resource::with(['location', 'room', 'asset', 'category'])->latest()->paginate(20);
         $locations = Location::all();
+        $roomCategories = Category::where('type', 'room')->orderBy('name')->get();
+        $assetCategories = Category::where('type', 'asset')->orderBy('name')->get();
+        $facilities = Facility::orderBy('name')->get();
 
-        return view('admin.resources', compact('resources', 'locations'));
+        return view('admin.resources', compact('resources', 'locations', 'roomCategories', 'assetCategories', 'facilities'));
     }
 
     public function storeResource(Request $request)
@@ -145,21 +150,15 @@ class AdminController extends Controller
                 'name' => $validated['name'],
                 'type' => $validated['type'],
                 'location_id' => $validated['location_id'],
-                'category' => $validated['category'] ?? null,
+                'category_id' => $validated['category_id'] ?? null,
                 'description' => $validated['description'] ?? null,
                 'is_active' => true,
             ]);
 
             if ($resource->type->value === 'room') {
-                $facilities = collect(explode(',', $validated['facilities_text'] ?? ''))
-                    ->map(fn (string $facility) => trim($facility))
-                    ->filter()
-                    ->values()
-                    ->all();
-
                 $resource->room()->create([
                     'capacity' => $validated['capacity'],
-                    'facilities' => $facilities ?: null,
+                    'facilities' => $validated['facilities'] ?? null,
                     'open_time' => $validated['open_time'] ?? null,
                     'close_time' => $validated['close_time'] ?? null,
                 ]);
@@ -190,8 +189,11 @@ class AdminController extends Controller
         $this->ensureCanManageResources();
 
         $locations = Location::orderBy('name')->get();
+        $roomCategories = Category::where('type', 'room')->orderBy('name')->get();
+        $assetCategories = Category::where('type', 'asset')->orderBy('name')->get();
+        $facilities = Facility::orderBy('name')->get();
 
-        return view('admin.resource-edit', compact('resource', 'locations'));
+        return view('admin.resource-edit', compact('resource', 'locations', 'roomCategories', 'assetCategories', 'facilities'));
     }
 
     public function updateResource(Request $request, Resource $resource)
@@ -204,14 +206,14 @@ class AdminController extends Controller
             $resource->update([
                 'name' => $validated['name'],
                 'location_id' => $validated['location_id'],
-                'category' => $validated['category'] ?? null,
+                'category_id' => $validated['category_id'] ?? null,
                 'description' => $validated['description'] ?? null,
             ]);
 
             if ($resource->type->value === 'room') {
                 $resource->room()->updateOrCreate([], [
                     'capacity' => $validated['capacity'],
-                    'facilities' => $this->facilitiesFromText($validated['facilities_text'] ?? ''),
+                    'facilities' => $validated['facilities'] ?? null,
                     'open_time' => $validated['open_time'] ?? null,
                     'close_time' => $validated['close_time'] ?? null,
                 ]);
@@ -243,7 +245,7 @@ class AdminController extends Controller
 
         $resource->update(['is_active' => ! $resource->is_active]);
 
-        return back()->with('success', $resource->is_active ? 'Resource diaktifkan.' : 'Resource dinonaktifkan.');
+        return back()->with('success', $resource->is_active ? 'Ruangan atau aset diaktifkan.' : 'Ruangan atau aset dinonaktifkan.');
     }
 
     public function destroyResource(Resource $resource)
@@ -256,12 +258,12 @@ class AdminController extends Controller
             ->exists();
 
         if ($hasActiveBookings) {
-            return back()->withErrors(['resource' => 'Resource masih punya booking aktif. Selesaikan atau batalkan booking terlebih dahulu.']);
+            return back()->withErrors(['resource' => 'Ruangan atau aset masih memiliki pemesanan aktif. Selesaikan atau batalkan pemesanan terlebih dahulu.']);
         }
 
         $resource->delete();
 
-        return back()->with('success', 'Resource dihapus.');
+        return back()->with('success', 'Ruangan atau aset dihapus.');
     }
 
     public function audit(Request $request)
@@ -300,7 +302,19 @@ class AdminController extends Controller
         $actions = AuditLog::query()->distinct()->orderBy('action')->pluck('action');
         $types = AuditLog::query()->distinct()->pluck('auditable_type')
             ->filter()
-            ->mapWithKeys(fn (string $type) => [$type => class_basename($type)]);
+            ->mapWithKeys(fn (string $type) => [$type => match (class_basename($type)) {
+                'Booking' => 'Peminjaman',
+                'AssetLoan' => 'Peminjaman aset',
+                'Resource' => 'Ruangan atau aset',
+                'User' => 'Pengguna',
+                'Location' => 'Lokasi',
+                'Category' => 'Kategori',
+                'Facility' => 'Fasilitas',
+                'Strike' => 'Pelanggaran',
+                'Suspension' => 'Pembatasan akun',
+                'Approval' => 'Persetujuan',
+                default => 'Data lain',
+            }]);
 
         return view('admin.audit', compact('logs', 'actions', 'types'));
     }
@@ -313,7 +327,7 @@ class AdminController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'type' => ['required', Rule::in($resource ? [$resource->type->value] : ['room', 'asset'])],
             'location_id' => ['required', 'exists:locations,id'],
-            'category' => ['nullable', 'string', 'max:255'],
+            'category_id' => ['nullable', 'integer', Rule::exists('categories', 'id')->where('type', $type)],
             'description' => ['nullable', 'string'],
             'buffer_minutes' => ['nullable', 'integer', 'min:0'],
             'min_duration_minutes' => ['nullable', 'integer', 'min:1'],
@@ -325,7 +339,8 @@ class AdminController extends Controller
 
         if ($type === 'room') {
             $rules['capacity'] = ['required', 'integer', 'min:1'];
-            $rules['facilities_text'] = ['nullable', 'string'];
+            $rules['facilities'] = ['nullable', 'array'];
+            $rules['facilities.*'] = ['string', Rule::exists('facilities', 'name')];
             $rules['open_time'] = ['nullable', 'date_format:H:i'];
             $rules['close_time'] = ['nullable', 'date_format:H:i', 'after:open_time'];
         }
@@ -343,23 +358,12 @@ class AdminController extends Controller
         return $rules;
     }
 
-    private function facilitiesFromText(string $text): ?array
-    {
-        $facilities = collect(explode(',', $text))
-            ->map(fn (string $facility) => trim($facility))
-            ->filter()
-            ->values()
-            ->all();
-
-        return $facilities ?: null;
-    }
-
     private function ensureCanManageResources(): void
     {
         abort_unless(
             auth()->user()->isAdmin() || auth()->user()->hasRole(Role::RESOURCE_MANAGER->value),
             403,
-            'Hanya pengelola resource yang bisa mengubah data ini.',
+            'Hanya pengelola ruangan dan aset yang bisa mengubah data ini.',
         );
     }
 

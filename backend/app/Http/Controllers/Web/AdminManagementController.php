@@ -59,7 +59,7 @@ class AdminManagementController extends Controller
         $this->ensureAdmin();
 
         if ($location->resources()->exists()) {
-            return back()->withErrors(['location' => 'Lokasi masih dipakai resource. Pindahkan resource terlebih dahulu.']);
+            return back()->withErrors(['location' => 'Lokasi masih dipakai ruangan atau aset. Pindahkan ruangan atau aset terlebih dahulu.']);
         }
 
         $location->delete();
@@ -227,7 +227,7 @@ class AdminManagementController extends Controller
 
         $penaltyService->issueStrike(User::findOrFail($validated['user_id']), $validated['reason']);
 
-        return back()->with('success', 'Strike dicatat.');
+        return back()->with('success', 'Pelanggaran dicatat.');
     }
 
     public function cancelStrike(Request $request, Strike $strike, PenaltyService $penaltyService)
@@ -240,7 +240,7 @@ class AdminManagementController extends Controller
 
         $penaltyService->cancelStrike($strike, $request->user(), $validated['reason']);
 
-        return back()->with('success', 'Strike dibatalkan.');
+        return back()->with('success', 'Pelanggaran dibatalkan.');
     }
 
     public function storeSuspension(Request $request)
@@ -256,7 +256,7 @@ class AdminManagementController extends Controller
 
         Suspension::create($validated);
 
-        return back()->with('success', 'Suspensi dibuat.');
+        return back()->with('success', 'Pembatasan akun dibuat.');
     }
 
     public function endSuspension(Suspension $suspension)
@@ -265,7 +265,7 @@ class AdminManagementController extends Controller
 
         $suspension->update(['ends_at' => now()]);
 
-        return back()->with('success', 'Suspensi diakhiri.');
+        return back()->with('success', 'Pembatasan akun diakhiri.');
     }
 
     public function bookings()
@@ -311,7 +311,7 @@ class AdminManagementController extends Controller
                 'user' => $booking->user,
                 'starts_at' => $booking->starts_at,
                 'ends_at' => $booking->ends_at,
-                'status' => $booking->status->value === 'checked_in' ? 'Check-in' : 'Disetujui',
+                'status' => $booking->status->value === 'checked_in' ? 'Sudah verifikasi' : 'Disetujui',
                 'status_tone' => $booking->status->value === 'checked_in' ? 'tag--amber' : 'tag--plain',
             ])
             ->concat($queuedLoans->map(fn (AssetLoan $loan) => [
@@ -451,7 +451,7 @@ class AdminManagementController extends Controller
             ->groupBy('resource_id')
             ->map(function ($items) {
                 return [
-                    'name' => $items->first()->resource->name ?? 'Resource',
+                    'name' => $items->first()->resource->name ?? 'Ruangan atau aset',
                     'bookings' => $items->count(),
                     'minutes' => (int) $items->sum(fn ($booking) => $booking->starts_at->diffInMinutes($booking->ends_at)),
                 ];
@@ -547,21 +547,21 @@ class AdminManagementController extends Controller
     private function settingDefinitions(): array
     {
         return [
-            'checkin_window_before_minutes' => ['group' => 'Check-in & verifikasi', 'label' => 'Jendela check-in sebelum jadwal', 'type' => 'integer', 'default' => 15, 'hint' => 'Menit sebelum waktu mulai.'],
-            'checkin_window_after_minutes' => ['group' => 'Check-in & verifikasi', 'label' => 'Jendela check-in setelah jadwal', 'type' => 'integer', 'default' => 15, 'hint' => 'Menit setelah waktu mulai.'],
-            'check_in_window_minutes' => ['group' => 'Check-in & verifikasi', 'label' => 'Batas check-in untuk no-show', 'type' => 'integer', 'default' => 15, 'hint' => 'Dipakai job penanda no-show.'],
-            'face_verification_enabled' => ['group' => 'Check-in & verifikasi', 'label' => 'Wajib verifikasi wajah', 'type' => 'boolean', 'default' => false, 'hint' => 'Aktifkan hanya jika face-service siap.'],
-            'checkin_failure_strike_threshold' => ['group' => 'Check-in & verifikasi', 'label' => 'Ambang strike gagal check-in', 'type' => 'integer', 'default' => 3, 'hint' => 'Jumlah gagal sebelum strike.'],
-            'gps_accuracy_threshold_meters' => ['group' => 'GPS & QR', 'label' => 'Akurasi GPS maksimum (meter)', 'type' => 'integer', 'default' => 50, 'hint' => 'Nilai akurasi yang masih diterima.'],
-            'gps_freshness_seconds' => ['group' => 'GPS & QR', 'label' => 'Umur data GPS maksimum (detik)', 'type' => 'integer', 'default' => 30, 'hint' => 'Data GPS lebih lama akan ditolak.'],
-            'gps_max_speed_mps' => ['group' => 'GPS & QR', 'label' => 'Kecepatan perpindahan maksimum (m/s)', 'type' => 'integer', 'default' => 100, 'hint' => 'Deteksi lompatan lokasi.'],
-            'qr_token_ttl_seconds' => ['group' => 'GPS & QR', 'label' => 'Masa berlaku QR (detik)', 'type' => 'integer', 'default' => 30, 'hint' => 'Token QR berganti otomatis.'],
-            'approval_expiry_hours' => ['group' => 'Persetujuan & waitlist', 'label' => 'Batas waktu persetujuan (jam)', 'type' => 'integer', 'default' => 48, 'hint' => 'Approval yang lewat batas akan kedaluwarsa.'],
-            'approval_escalate_on_expiry' => ['group' => 'Persetujuan & waitlist', 'label' => 'Naikkan ulang saat kedaluwarsa', 'type' => 'boolean', 'default' => false, 'hint' => 'Alihkan approval ke periode berikutnya.'],
-            'waitlist_offer_minutes' => ['group' => 'Persetujuan & waitlist', 'label' => 'Batas tawaran waitlist (menit)', 'type' => 'integer', 'default' => 30, 'hint' => 'Waktu pengguna menerima slot kosong.'],
-            'strike_window_days' => ['group' => 'Penalti', 'label' => 'Jendela hitung strike (hari)', 'type' => 'integer', 'default' => 30, 'hint' => 'Strike di luar jendela tidak dihitung.'],
-            'strike_threshold' => ['group' => 'Penalti', 'label' => 'Ambang strike untuk suspensi', 'type' => 'integer', 'default' => 3, 'hint' => 'Jumlah strike pemicu suspensi otomatis.'],
-            'suspension_duration_days' => ['group' => 'Penalti', 'label' => 'Durasi suspensi otomatis (hari)', 'type' => 'integer', 'default' => 7, 'hint' => 'Berlaku untuk suspensi otomatis.'],
+            'checkin_window_before_minutes' => ['group' => 'Kehadiran & verifikasi', 'label' => 'Batas waktu masuk sebelum jadwal', 'type' => 'integer', 'default' => 15, 'hint' => 'Berapa menit sebelum jadwal masuk masih diterima.'],
+            'checkin_window_after_minutes' => ['group' => 'Kehadiran & verifikasi', 'label' => 'Batas waktu masuk setelah jadwal', 'type' => 'integer', 'default' => 15, 'hint' => 'Berapa menit setelah jadwal masuk masih diterima.'],
+            'check_in_window_minutes' => ['group' => 'Kehadiran & verifikasi', 'label' => 'Batas masuk sebelum dinyatakan tidak hadir', 'type' => 'integer', 'default' => 15, 'hint' => 'Dipakai untuk menandai pemesanan yang tidak dihadiri.'],
+            'face_verification_enabled' => ['group' => 'Kehadiran & verifikasi', 'label' => 'Wajib verifikasi wajah', 'type' => 'boolean', 'default' => false, 'hint' => 'Aktifkan hanya jika layanan verifikasi wajah siap.'],
+            'checkin_failure_strike_threshold' => ['group' => 'Kehadiran & verifikasi', 'label' => 'Batas gagal masuk sebelum pelanggaran', 'type' => 'integer', 'default' => 3, 'hint' => 'Jumlah kegagalan sebelum pelanggaran dicatat.'],
+            'gps_accuracy_threshold_meters' => ['group' => 'Lokasi & kode QR', 'label' => 'Akurasi lokasi maksimum (meter)', 'type' => 'integer', 'default' => 50, 'hint' => 'Nilai akurasi yang masih diterima.'],
+            'gps_freshness_seconds' => ['group' => 'Lokasi & kode QR', 'label' => 'Umur data lokasi maksimum (detik)', 'type' => 'integer', 'default' => 30, 'hint' => 'Data lokasi yang lebih lama akan ditolak.'],
+            'gps_max_speed_mps' => ['group' => 'Lokasi & kode QR', 'label' => 'Kecepatan perpindahan maksimum (m/s)', 'type' => 'integer', 'default' => 100, 'hint' => 'Untuk mendeteksi lompatan lokasi.'],
+            'qr_token_ttl_seconds' => ['group' => 'Lokasi & kode QR', 'label' => 'Masa berlaku kode QR (detik)', 'type' => 'integer', 'default' => 30, 'hint' => 'Kode QR berganti otomatis.'],
+            'approval_expiry_hours' => ['group' => 'Persetujuan & antrean', 'label' => 'Batas waktu persetujuan (jam)', 'type' => 'integer', 'default' => 48, 'hint' => 'Persetujuan yang lewat batas akan kedaluwarsa.'],
+            'approval_escalate_on_expiry' => ['group' => 'Persetujuan & antrean', 'label' => 'Naikkan ulang saat kedaluwarsa', 'type' => 'boolean', 'default' => false, 'hint' => 'Alihkan persetujuan ke periode berikutnya.'],
+            'waitlist_offer_minutes' => ['group' => 'Persetujuan & antrean', 'label' => 'Batas tawaran antrean (menit)', 'type' => 'integer', 'default' => 30, 'hint' => 'Waktu pengguna menerima slot kosong.'],
+            'strike_window_days' => ['group' => 'Pelanggaran', 'label' => 'Rentang hitung pelanggaran (hari)', 'type' => 'integer', 'default' => 30, 'hint' => 'Pelanggaran di luar rentang tidak dihitung.'],
+            'strike_threshold' => ['group' => 'Pelanggaran', 'label' => 'Batas pelanggaran sebelum pembatasan akun', 'type' => 'integer', 'default' => 3, 'hint' => 'Jumlah pelanggaran pemicu pembatasan akun otomatis.'],
+            'suspension_duration_days' => ['group' => 'Pelanggaran', 'label' => 'Durasi pembatasan akun otomatis (hari)', 'type' => 'integer', 'default' => 7, 'hint' => 'Berlaku untuk pembatasan akun otomatis.'],
         ];
     }
 
@@ -569,8 +569,8 @@ class AdminManagementController extends Controller
     {
         return [
             RoleEnum::ADMIN->value => 'Admin',
-            RoleEnum::APPROVER->value => 'Approver',
-            RoleEnum::RESOURCE_MANAGER->value => 'Pengelola resource',
+            RoleEnum::APPROVER->value => 'Penyetuju',
+            RoleEnum::RESOURCE_MANAGER->value => 'Pengelola ruangan dan aset',
             RoleEnum::MEMBER->value => 'Anggota',
         ];
     }
@@ -585,7 +585,7 @@ class AdminManagementController extends Controller
         abort_unless(
             auth()->user()->isAdmin() || auth()->user()->hasRole(RoleEnum::RESOURCE_MANAGER->value),
             403,
-            'Hanya admin atau pengelola resource yang bisa mengelola peminjaman.',
+            'Hanya admin atau pengelola ruangan dan aset yang bisa mengelola peminjaman.',
         );
     }
 }

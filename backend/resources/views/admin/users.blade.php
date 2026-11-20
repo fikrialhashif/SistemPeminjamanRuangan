@@ -6,7 +6,7 @@
     <header class="plate">
         <div>
             <h1 class="plate-title">Pengguna</h1>
-            <p class="plate-desc">Kelola akun, departemen, dan peran akses panel admin.</p>
+            <p class="plate-desc">Kelola akun, departemen, dan hak akses panel admin.</p>
         </div>
         <div class="plate-aside">
             <div class="plate-stat">
@@ -25,7 +25,7 @@
             </div>
             <div class="filter-actions">
                 <button type="submit" class="btn btn--primary">Cari</button>
-                <a class="btn btn--ghost" href="{{ route('admin.users') }}">Reset</a>
+                <a class="btn btn--ghost" href="{{ route('admin.users') }}">Atur ulang</a>
             </div>
         </div>
     </form>
@@ -43,7 +43,7 @@
                         <tr>
                             <th scope="col">Pengguna</th>
                             <th scope="col">Departemen</th>
-                            <th scope="col">Peran</th>
+                            <th scope="col">Hak akses</th>
                             <th scope="col">Dibuat</th>
                             <th scope="col">Aksi</th>
                         </tr>
@@ -61,18 +61,18 @@
                                     </div>
                                 </td>
                                 <td data-label="Departemen">{{ $user->department->name ?? '—' }}</td>
-                                <td data-label="Peran">
+                                <td data-label="Hak akses">
                                     <div class="tag-row">
                                         @forelse($user->roles as $role)
-                                            <span class="tag">{{ $roleLabels[$role->name->value] ?? $role->name->value }}</span>
+                                            <span class="tag">{{ $roleLabels[$role->name->value] ?? 'Hak akses tidak dikenal' }}</span>
                                         @empty
-                                            <span class="cell-muted">Belum ada peran</span>
+                                            <span class="cell-muted">Belum ada hak akses</span>
                                         @endforelse
                                     </div>
                                 </td>
                                 <td data-label="Dibuat">{{ $user->created_at->locale('id')->isoFormat('D MMM Y') }}</td>
                                 <td data-label="Aksi" class="data-actions">
-                                    <button type="button" class="btn btn--ghost btn--sm" data-open-dialog="editUser{{ $user->id }}">Edit</button>
+                                    <button type="button" class="btn btn--ghost btn--sm" data-open-dialog="editUser{{ $user->id }}">Ubah</button>
                                 </td>
                             </tr>
                         @endforeach
@@ -88,7 +88,7 @@
         <div class="modal-head">
             <div>
                 <h2 class="modal-title" id="createUserTitle">Tambah pengguna</h2>
-                <p class="modal-desc">Akun baru langsung bisa dipakai untuk login aplikasi atau panel.</p>
+                <p class="modal-desc">Akun baru langsung bisa dipakai untuk masuk ke aplikasi atau panel.</p>
             </div>
             <button type="button" class="modal-close" data-close-dialog aria-label="Tutup dialog">&times;</button>
         </div>
@@ -108,8 +108,8 @@
         <dialog id="editUser{{ $user->id }}" class="modal" aria-labelledby="editUserTitle{{ $user->id }}">
             <div class="modal-head">
                 <div>
-                    <h2 class="modal-title" id="editUserTitle{{ $user->id }}">Edit {{ $user->name }}</h2>
-                    <p class="modal-desc">Perbarui data akun dan peran akses.</p>
+                    <h2 class="modal-title" id="editUserTitle{{ $user->id }}">Ubah {{ $user->name }}</h2>
+                    <p class="modal-desc">Perbarui data akun dan hak akses.</p>
                 </div>
                 <button type="button" class="modal-close" data-close-dialog aria-label="Tutup dialog">&times;</button>
             </div>

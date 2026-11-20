@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Enums\ResourceType;
 use App\Enums\Role as RoleEnum;
+use App\Models\Category;
 use App\Models\Department;
 use App\Models\Location;
 use App\Models\Resource;
@@ -60,11 +61,16 @@ class DatabaseSeeder extends Seeder
         );
         $member->roles()->syncWithoutDetaching([$roles[RoleEnum::MEMBER->value]->id]);
 
+        $this->call(MasterDataSeeder::class);
+
+        $roomCategories = Category::where('type', ResourceType::ROOM)->get()->keyBy('name');
+        $assetCategories = Category::where('type', ResourceType::ASSET)->get()->keyBy('name');
+
         $room1 = Resource::firstOrCreate(
             ['name' => 'Ruang Rapat A1'],
-            ['type' => ResourceType::ROOM, 'location_id' => $locations[0]->id, 'category' => 'meeting_room', 'is_active' => true],
+            ['type' => ResourceType::ROOM, 'location_id' => $locations[0]->id, 'category_id' => $roomCategories['Ruang rapat']->id, 'is_active' => true],
         );
-        $room1->room()->firstOrCreate(['resource_id' => $room1->id], ['capacity' => 20, 'facilities' => ['projector', 'whiteboard', 'ac']]);
+        $room1->room()->firstOrCreate(['resource_id' => $room1->id], ['capacity' => 20, 'facilities' => ['Proyektor', 'Papan Tulis', 'Pendingin Udara']]);
         $room1->rules()->firstOrCreate(['resource_id' => $room1->id], [
             'buffer_minutes' => 15,
             'min_duration_minutes' => 30,
@@ -76,9 +82,9 @@ class DatabaseSeeder extends Seeder
 
         $room2 = Resource::firstOrCreate(
             ['name' => 'Lab Komputer B2'],
-            ['type' => ResourceType::ROOM, 'location_id' => $locations[1]->id, 'category' => 'lab', 'is_active' => true],
+            ['type' => ResourceType::ROOM, 'location_id' => $locations[1]->id, 'category_id' => $roomCategories['Laboratorium']->id, 'is_active' => true],
         );
-        $room2->room()->firstOrCreate(['resource_id' => $room2->id], ['capacity' => 40, 'facilities' => ['computers', 'projector', 'ac']]);
+        $room2->room()->firstOrCreate(['resource_id' => $room2->id], ['capacity' => 40, 'facilities' => ['Komputer', 'Proyektor', 'Pendingin Udara']]);
         $room2->rules()->firstOrCreate(['resource_id' => $room2->id], [
             'buffer_minutes' => 10,
             'min_duration_minutes' => 60,
@@ -90,7 +96,7 @@ class DatabaseSeeder extends Seeder
 
         $asset1 = Resource::firstOrCreate(
             ['name' => 'Proyektor Portable'],
-            ['type' => ResourceType::ASSET, 'location_id' => $locations[2]->id, 'category' => 'electronics', 'is_active' => true],
+            ['type' => ResourceType::ASSET, 'location_id' => $locations[2]->id, 'category_id' => $assetCategories['Proyektor']->id, 'is_active' => true],
         );
         $asset1->asset()->firstOrCreate(['resource_id' => $asset1->id], ['code' => 'PRJ-001', 'condition' => 'good']);
         $asset1->rules()->firstOrCreate(['resource_id' => $asset1->id], [
@@ -104,7 +110,7 @@ class DatabaseSeeder extends Seeder
 
         $asset2 = Resource::firstOrCreate(
             ['name' => 'Kamera DSLR'],
-            ['type' => ResourceType::ASSET, 'location_id' => $locations[2]->id, 'category' => 'electronics', 'is_active' => true],
+            ['type' => ResourceType::ASSET, 'location_id' => $locations[2]->id, 'category_id' => $assetCategories['Kamera']->id, 'is_active' => true],
         );
         $asset2->asset()->firstOrCreate(['resource_id' => $asset2->id], ['code' => 'CAM-001', 'condition' => 'good']);
         $asset2->rules()->firstOrCreate(['resource_id' => $asset2->id], [

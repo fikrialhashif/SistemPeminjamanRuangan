@@ -28,8 +28,8 @@
                 </select>
             </div>
             <div class="filter-actions">
-                <button type="submit" class="btn btn--primary">Filter</button>
-                <a class="btn btn--ghost" href="{{ route('admin.loans') }}">Reset</a>
+                <button type="submit" class="btn btn--primary">Saring</button>
+                <a class="btn btn--ghost" href="{{ route('admin.loans') }}">Atur ulang</a>
             </div>
         </div>
     </form>
@@ -38,7 +38,7 @@
         @if($loans->isEmpty())
             <div class="empty">
                 <p class="empty-title">Belum ada peminjaman aset.</p>
-                <p>Data muncul setelah pengguna membuat booking aset.</p>
+                <p>Data muncul setelah pengguna meminjam aset.</p>
             </div>
         @else
             <div class="table-wrap">
@@ -61,7 +61,7 @@
                                     'in_use' => 'Dipakai',
                                     'returned' => 'Dikembalikan',
                                     'closed' => 'Selesai',
-                                    default => ucfirst($loan->status->value),
+                                    default => 'Status lain',
                                 };
                             @endphp
                             <tr>
@@ -109,7 +109,7 @@
                                                 <option value="lost">Hilang</option>
                                                 <option value="maintenance">Perawatan</option>
                                             </select>
-                                            <input class="input input--sm" type="text" name="notes" placeholder="Catatan (opsional)">
+                                            <input class="input input--sm" type="text" name="notes" placeholder="Catatan (boleh kosong)">
                                             <button type="submit" class="btn btn--primary btn--sm">Kembalikan</button>
                                         </form>
                                     @else

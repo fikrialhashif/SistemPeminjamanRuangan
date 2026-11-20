@@ -1,6 +1,6 @@
 @extends('admin.layout')
 
-@section('title', 'Lokasi & geofence')
+@section('title', 'Lokasi & area')
 
 @push('head')
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -9,8 +9,8 @@
 @section('content')
     <header class="plate">
         <div>
-            <h1 class="plate-title">Lokasi &amp; geofence</h1>
-            <p class="plate-desc">Pilih radius atau gambar polygon langsung di peta. Bentuk yang dipilih dipakai untuk validasi check-in GPS.</p>
+            <h1 class="plate-title">Lokasi &amp; area</h1>
+            <p class="plate-desc">Tentukan area di peta dengan radius atau gambar area. Area ini dipakai untuk memeriksa lokasi saat masuk.</p>
         </div>
         <div class="plate-aside">
             <div class="plate-stat">
@@ -35,8 +35,8 @@
                         <tr>
                             <th scope="col">Lokasi</th>
                             <th scope="col">Koordinat</th>
-                            <th scope="col">Geofence</th>
-                            <th scope="col">Resource</th>
+                            <th scope="col">Area</th>
+                            <th scope="col">Ruangan &amp; aset</th>
                             <th scope="col">Aksi</th>
                         </tr>
                     </thead>
@@ -50,17 +50,17 @@
                                 <td data-label="Koordinat">
                                     <span class="cell-ip">{{ $location->latitude }}, {{ $location->longitude }}</span>
                                 </td>
-                                <td data-label="Geofence">
+                                <td data-label="Area">
                                     @if(is_array($location->polygon) && count($location->polygon) >= 3)
-                                        <span class="tag tag--amber">Polygon {{ count($location->polygon) }} titik</span>
+                                        <span class="tag tag--amber">Area {{ count($location->polygon) }} titik</span>
                                     @else
                                         <span class="tag">Radius {{ $location->radius }} m</span>
                                     @endif
                                 </td>
-                                <td data-label="Resource">{{ $location->resources_count }}</td>
+                                <td data-label="Ruangan &amp; aset">{{ $location->resources_count }}</td>
                                 <td data-label="Aksi" class="data-actions">
                                     <div class="cell-actions">
-                                        <button type="button" class="btn btn--ghost btn--sm" data-open-dialog="editLocation{{ $location->id }}">Edit</button>
+                                        <button type="button" class="btn btn--ghost btn--sm" data-open-dialog="editLocation{{ $location->id }}">Ubah</button>
                                         <form method="POST" action="{{ route('admin.locations.destroy', $location) }}" data-confirm="Hapus lokasi {{ $location->name }}?">
                                             @csrf
                                             @method('DELETE')
@@ -80,7 +80,7 @@
         <div class="modal-head">
             <div>
                 <h2 class="modal-title" id="createLocationTitle">Tambah lokasi</h2>
-                <p class="modal-desc">Pilih radius, atau gambar polygon langsung di peta.</p>
+                <p class="modal-desc">Pilih radius atau gambar area langsung di peta.</p>
             </div>
             <button type="button" class="modal-close" data-close-dialog aria-label="Tutup dialog">&times;</button>
         </div>
@@ -100,8 +100,8 @@
         <dialog id="editLocation{{ $location->id }}" class="modal modal--map" aria-labelledby="editLocationTitle{{ $location->id }}">
             <div class="modal-head">
                 <div>
-                    <h2 class="modal-title" id="editLocationTitle{{ $location->id }}">Edit {{ $location->name }}</h2>
-                    <p class="modal-desc">Perbarui radius atau gambar ulang polygon geofence.</p>
+                    <h2 class="modal-title" id="editLocationTitle{{ $location->id }}">Ubah {{ $location->name }}</h2>
+                    <p class="modal-desc">Perbarui radius atau gambar ulang area.</p>
                 </div>
                 <button type="button" class="modal-close" data-close-dialog aria-label="Tutup dialog">&times;</button>
             </div>

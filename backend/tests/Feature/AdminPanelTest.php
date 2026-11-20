@@ -8,7 +8,9 @@ use App\Models\Approval;
 use App\Models\AssetLoan;
 use App\Models\AuditLog;
 use App\Models\Booking;
+use App\Models\Category;
 use App\Models\ConditionReport;
+use App\Models\Facility;
 use App\Models\LoanEvent;
 use App\Models\Location;
 use App\Models\Resource;
@@ -25,15 +27,19 @@ class AdminPanelTest extends TestCase
     public function test_admin_can_create_a_room_with_details_and_booking_rules(): void
     {
         $location = $this->location();
+        $category = Category::create(['name' => 'Ruang rapat', 'type' => 'room']);
+        collect(['Pendingin Udara', 'Proyektor', 'Papan Tulis'])->each(
+            fn (string $name) => Facility::create(['name' => $name]),
+        );
 
         $this->actingAs($this->userWithRole(RoleEnum::ADMIN))
             ->post(route('admin.resources.store'), [
                 'name' => 'Ruang Rapat 2.04',
                 'type' => 'room',
                 'location_id' => $location->id,
-                'category' => 'Ruang rapat',
+                'category_id' => $category->id,
                 'capacity' => 12,
-                'facilities_text' => 'AC, Proyektor, Whiteboard',
+                'facilities' => ['Pendingin Udara', 'Proyektor', 'Papan Tulis'],
                 'open_time' => '08:00',
                 'close_time' => '17:00',
                 'buffer_minutes' => 10,
@@ -49,7 +55,8 @@ class AdminPanelTest extends TestCase
         $resource = Resource::where('name', 'Ruang Rapat 2.04')->firstOrFail();
 
         $this->assertSame(12, $resource->room->capacity);
-        $this->assertSame(['AC', 'Proyektor', 'Whiteboard'], $resource->room->facilities);
+        $this->assertSame(['Pendingin Udara', 'Proyektor', 'Papan Tulis'], $resource->room->facilities);
+        $this->assertSame('Ruang rapat', $resource->category->name);
         $this->assertSame(10, $resource->rules->buffer_minutes);
         $this->assertSame('one_level', $resource->rules->approval_path->value);
     }
@@ -57,12 +64,14 @@ class AdminPanelTest extends TestCase
     public function test_admin_can_create_an_asset_with_code_and_condition(): void
     {
         $location = $this->location();
+        $category = Category::create(['name' => 'Kamera', 'type' => 'asset']);
 
         $this->actingAs($this->userWithRole(RoleEnum::ADMIN))
             ->post(route('admin.resources.store'), [
                 'name' => 'Kamera Sony',
                 'type' => 'asset',
                 'location_id' => $location->id,
+                'category_id' => $category->id,
                 'code' => 'CAM-001',
                 'condition' => 'good',
             ])
@@ -143,12 +152,14 @@ class AdminPanelTest extends TestCase
     {
         $admin = $this->userWithRole(RoleEnum::ADMIN);
         $location = $this->location();
+        $category = Category::create(['name' => 'Ruang rapat', 'type' => 'room']);
+        collect(['Pendingin Udara', 'Proyektor'])->each(fn (string $name) => Facility::create(['name' => $name]));
         $resource = Resource::create([
             'name' => 'Ruang Awal',
             'type' => 'room',
             'location_id' => $location->id,
         ]);
-        $resource->room()->create(['capacity' => 8, 'facilities' => ['AC']]);
+        $resource->room()->create(['capacity' => 8, 'facilities' => ['Pendingin Udara']]);
         $resource->rules()->create([
             'buffer_minutes' => 0,
             'min_duration_minutes' => 30,
@@ -173,8 +184,9 @@ class AdminPanelTest extends TestCase
                 'name' => 'Ruang Baru',
                 'type' => 'room',
                 'location_id' => $location->id,
+                'category_id' => $category->id,
                 'capacity' => 24,
-                'facilities_text' => 'AC, Proyektor',
+                'facilities' => ['Pendingin Udara', 'Proyektor'],
                 'buffer_minutes' => 15,
                 'min_duration_minutes' => 60,
                 'max_duration_minutes' => 240,
@@ -185,11 +197,12 @@ class AdminPanelTest extends TestCase
             ->assertRedirect(route('admin.resources'))
             ->assertSessionHasNoErrors();
 
-        $resource->refresh()->load(['room', 'rules']);
+        $resource->refresh()->load(['room', 'rules', 'category']);
 
         $this->assertSame('Ruang Baru', $resource->name);
         $this->assertSame(24, $resource->room->capacity);
-        $this->assertSame(['AC', 'Proyektor'], $resource->room->facilities);
+        $this->assertSame(['Pendingin Udara', 'Proyektor'], $resource->room->facilities);
+        $this->assertSame('Ruang rapat', $resource->category->name);
         $this->assertSame(15, $resource->rules->buffer_minutes);
         $this->assertSame('two_level', $resource->rules->approval_path->value);
 
@@ -214,6 +227,8 @@ class AdminPanelTest extends TestCase
 
         foreach ([
             'admin.locations',
+            'admin.categories',
+            'admin.facilities',
             'admin.settings',
             'admin.users',
             'admin.penalties',

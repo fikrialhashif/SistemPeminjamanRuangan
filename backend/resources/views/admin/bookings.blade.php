@@ -1,6 +1,6 @@
 @extends('admin.layout')
 
-@section('title', 'Booking')
+@section('title', 'Peminjaman')
 
 @section('content')
     @php
@@ -12,7 +12,7 @@
 
     <header class="plate">
         <div>
-            <h1 class="plate-title">Booking</h1>
+            <h1 class="plate-title">Peminjaman</h1>
             <p class="plate-desc">Pantau ruangan yang sedang dipakai dan aset yang sedang digunakan saat ini.</p>
         </div>
         <div class="plate-aside">
@@ -56,7 +56,7 @@
             @if($activeRoomBookings->isEmpty())
                 <div class="empty">
                     <p class="empty-title">Tidak ada ruangan yang sedang dipakai.</p>
-                    <p>Booking yang berjalan akan muncul di sini.</p>
+                    <p>Peminjaman yang sedang berjalan akan muncul di sini.</p>
                 </div>
             @else
                 <div class="table-wrap">
@@ -132,9 +132,12 @@
                                 @php
                                     $isOverdue = $loan->due_at && $loan->due_at->isPast();
                                     $statusLabel = match ($loan->status->value) {
+                                        'reserved' => 'Dipesan',
                                         'handed_over' => 'Diserahkan',
                                         'in_use' => 'Dipakai',
-                                        default => ucfirst($loan->status->value),
+                                        'returned' => 'Dikembalikan',
+                                        'closed' => 'Selesai',
+                                        default => 'Status lain',
                                     };
                                 @endphp
                                 <tr>
@@ -178,20 +181,20 @@
     <section class="panel panel--spaced">
         <div class="panel-head">
             <h2 class="panel-title">Antrian hari ini</h2>
-            <span class="tag">{{ number_format($queueCount, 0, ',', '.') }} item</span>
+            <span class="tag">{{ number_format($queueCount, 0, ',', '.') }} entri</span>
         </div>
 
         @if($queuedEntries->isEmpty())
             <div class="empty">
                 <p class="empty-title">Tidak ada antrian hari ini.</p>
-                <p>Booking ruangan dan peminjaman aset yang akan mulai hari ini akan muncul di sini.</p>
+                <p>Jadwal ruangan dan aset yang akan mulai hari ini akan muncul di sini.</p>
             </div>
         @else
             <div class="table-wrap">
                 <table class="data data--stack">
                     <thead>
                         <tr>
-                            <th scope="col">Item</th>
+                            <th scope="col">Kegiatan</th>
                             <th scope="col">Jenis</th>
                             <th scope="col">Pemesan</th>
                             <th scope="col">Mulai</th>
@@ -202,7 +205,7 @@
                     <tbody>
                         @foreach($queuedEntries as $entry)
                             <tr>
-                                <td data-label="Item">
+                                <td data-label="Kegiatan">
                                     <div class="cell-title">{{ $entry['title'] }}</div>
                                     <div class="cell-sub">{{ $entry['subtitle'] }}</div>
                                 </td>

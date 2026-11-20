@@ -3,6 +3,7 @@
 use App\Http\Controllers\QrDisplayController;
 use App\Http\Controllers\Web\AdminController;
 use App\Http\Controllers\Web\AdminManagementController;
+use App\Http\Controllers\Web\MasterDataController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -33,6 +34,16 @@ Route::prefix('admin')->group(function () {
         Route::post('locations', [AdminManagementController::class, 'storeLocation'])->name('admin.locations.store');
         Route::put('locations/{location}', [AdminManagementController::class, 'updateLocation'])->name('admin.locations.update');
         Route::delete('locations/{location}', [AdminManagementController::class, 'destroyLocation'])->name('admin.locations.destroy');
+
+        Route::get('categories', [MasterDataController::class, 'categories'])->name('admin.categories');
+        Route::post('categories', [MasterDataController::class, 'storeCategory'])->name('admin.categories.store');
+        Route::put('categories/{category}', [MasterDataController::class, 'updateCategory'])->name('admin.categories.update');
+        Route::delete('categories/{category}', [MasterDataController::class, 'destroyCategory'])->name('admin.categories.destroy');
+
+        Route::get('facilities', [MasterDataController::class, 'facilities'])->name('admin.facilities');
+        Route::post('facilities', [MasterDataController::class, 'storeFacility'])->name('admin.facilities.store');
+        Route::put('facilities/{facility}', [MasterDataController::class, 'updateFacility'])->name('admin.facilities.update');
+        Route::delete('facilities/{facility}', [MasterDataController::class, 'destroyFacility'])->name('admin.facilities.destroy');
 
         Route::get('settings', [AdminManagementController::class, 'settings'])->name('admin.settings');
         Route::put('settings', [AdminManagementController::class, 'updateSettings'])->name('admin.settings.update');

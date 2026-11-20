@@ -6,12 +6,12 @@
     <header class="plate">
         <div>
             <h1 class="plate-title">Laporan</h1>
-            <p class="plate-desc">Ringkasan utilisasi ruangan, no-show, aset populer, dan keberhasilan verifikasi check-in.</p>
+            <p class="plate-desc">Ringkasan pemakaian ruangan, pemesanan yang tidak dihadiri, aset populer, dan keberhasilan verifikasi kehadiran.</p>
         </div>
         <div class="plate-aside">
             <div class="plate-stat">
                 <span class="plate-stat-value">{{ number_format($totalBookings, 0, ',', '.') }}</span>
-                <span class="plate-stat-label">booking pada periode</span>
+                <span class="plate-stat-label">peminjaman pada periode</span>
             </div>
         </div>
     </header>
@@ -35,22 +35,22 @@
 
     <div class="board">
         <div class="board-cell">
-            <span class="board-label">Total booking</span>
+            <span class="board-label">Total peminjaman</span>
             <span class="board-value">{{ number_format($totalBookings, 0, ',', '.') }}</span>
             <span class="board-note">Semua status pada periode</span>
         </div>
         <div class="board-cell">
             <span class="board-label">Selesai</span>
             <span class="board-value">{{ number_format($completedBookings, 0, ',', '.') }}</span>
-            <span class="board-note">Booking berstatus completed</span>
+            <span class="board-note">Peminjaman yang sudah selesai</span>
         </div>
         <div class="board-cell">
-            <span class="board-label">No-show</span>
+            <span class="board-label">Tidak dihadiri</span>
             <span class="board-value">{{ number_format($noShowBookings, 0, ',', '.') }}</span>
-            <span class="board-note">{{ $noShowRate }}% dari total booking</span>
+            <span class="board-note">{{ $noShowRate }}% dari total peminjaman</span>
         </div>
         <div class="board-cell">
-            <span class="board-label">Percobaan check-in</span>
+            <span class="board-label">Percobaan verifikasi kehadiran</span>
             <span class="board-value">{{ number_format($verification['total_attempts'], 0, ',', '.') }}</span>
             <span class="board-note">QR {{ $verification['qr_success'] }}% · GPS {{ $verification['gps_success'] }}% · Wajah {{ $verification['face_success'] }}%</span>
         </div>
@@ -59,13 +59,13 @@
     <div class="split">
         <section class="panel">
             <div class="panel-head">
-                <h2 class="panel-title">Utilisasi ruangan</h2>
-                <span class="tag">Completed</span>
+                <h2 class="panel-title">Pemakaian ruangan</h2>
+                <span class="tag">Selesai</span>
             </div>
             @if($roomUtilization->isEmpty())
                 <div class="empty">
                     <p class="empty-title">Belum ada data.</p>
-                    <p>Booking ruangan yang selesai pada periode ini akan muncul di sini.</p>
+                    <p>Peminjaman ruangan yang selesai pada periode ini akan muncul di sini.</p>
                 </div>
             @else
                 <div class="table-wrap">
@@ -73,7 +73,7 @@
                         <thead>
                             <tr>
                                 <th scope="col">Ruangan</th>
-                                <th scope="col">Booking</th>
+                                <th scope="col">Jumlah</th>
                                 <th scope="col">Durasi</th>
                             </tr>
                         </thead>
@@ -133,15 +133,15 @@
         </div>
         <div class="stats-grid">
             <div class="stat">
-                <span class="stat-label">QR valid</span>
+                <span class="stat-label">Kode QR cocok</span>
                 <span class="stat-value">{{ $verification['qr_success'] }}%</span>
             </div>
             <div class="stat">
-                <span class="stat-label">GPS valid</span>
+                <span class="stat-label">Lokasi cocok</span>
                 <span class="stat-value">{{ $verification['gps_success'] }}%</span>
             </div>
             <div class="stat">
-                <span class="stat-label">Wajah valid</span>
+                <span class="stat-label">Wajah cocok</span>
                 <span class="stat-value">{{ $verification['face_success'] }}%</span>
             </div>
             <div class="stat">

@@ -20,8 +20,8 @@
         </div>
 
         <div class="field field--wide">
-            <span class="field-label">Bentuk geofence</span>
-            <div class="segmented" role="radiogroup" aria-label="Bentuk geofence">
+            <span class="field-label">Bentuk area</span>
+            <div class="segmented" role="radiogroup" aria-label="Bentuk area">
                 <label class="segment">
                     <input type="radio" name="geofence_type" value="radius" @checked($geofenceType === 'radius')>
                     <span>
@@ -32,8 +32,8 @@
                 <label class="segment">
                     <input type="radio" name="geofence_type" value="polygon" @checked($geofenceType === 'polygon')>
                     <span>
-                        <strong>Polygon</strong>
-                        <small>Area bebas mengikuti bentuk bangunan</small>
+                        <strong>Area bebas</strong>
+                        <small>Area mengikuti bentuk bangunan</small>
                     </span>
                 </label>
             </div>
@@ -41,7 +41,7 @@
 
         <div class="field field--wide">
             <div class="map-frame">
-                <div class="location-map" data-location-map aria-label="Peta pengaturan geofence"></div>
+                <div class="location-map" data-location-map aria-label="Peta pengaturan area"></div>
             </div>
             <div class="map-bar">
                 <span class="map-status" data-map-status aria-live="polite">Menyiapkan peta...</span>
@@ -50,26 +50,26 @@
                     <button type="button" class="btn btn--ghost btn--sm" data-map-clear>Bersihkan</button>
                 </div>
             </div>
-            <span class="field-hint" data-map-hint>Klik peta untuk memindahkan pusat geofence.</span>
+            <span class="field-hint" data-map-hint>Klik peta untuk memindahkan titik tengah area.</span>
         </div>
 
         <div class="field">
-            <label class="field-label" for="{{ $prefix }}_latitude">Latitude</label>
+            <label class="field-label" for="{{ $prefix }}_latitude">Garis lintang</label>
             <input class="input" type="number" id="{{ $prefix }}_latitude" name="latitude" value="{{ $latitudeValue }}" step="0.0000001" min="-90" max="90" data-lat-input required>
         </div>
         <div class="field">
-            <label class="field-label" for="{{ $prefix }}_longitude">Longitude</label>
+            <label class="field-label" for="{{ $prefix }}_longitude">Garis bujur</label>
             <input class="input" type="number" id="{{ $prefix }}_longitude" name="longitude" value="{{ $longitudeValue }}" step="0.0000001" min="-180" max="180" data-lng-input required>
         </div>
         <div class="field" data-radius-field>
-            <label class="field-label" for="{{ $prefix }}_radius">Radius geofence (meter)</label>
+            <label class="field-label" for="{{ $prefix }}_radius">Jangkauan area (meter)</label>
             <input class="input" type="number" id="{{ $prefix }}_radius" name="radius" value="{{ $radiusValue }}" min="10" step="1" data-radius-input>
             <span class="field-hint">Lingkaran di peta berubah mengikuti angka ini.</span>
         </div>
         <div class="field" data-polygon-field hidden>
-            <span class="field-label">Titik polygon</span>
+            <span class="field-label">Titik area</span>
             <span class="polygon-count" data-polygon-count>0 titik</span>
-            <span class="field-hint">Minimal 3 titik. Klik peta untuk menambah, lalu seret titik untuk menyesuaikan.</span>
+            <span class="field-hint">Minimal 3 titik. Klik peta untuk menambah, lalu geser titik jika perlu.</span>
         </div>
     </div>
 

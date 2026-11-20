@@ -15,8 +15,8 @@
         $isResourceManager = auth()->user()->hasRole('resource_manager');
         $roleLabel = match ($roleName) {
             'admin' => 'Admin',
-            'approver' => 'Approver',
-            'resource_manager' => 'Pengelola aset',
+            'approver' => 'Penyetuju',
+            'resource_manager' => 'Pengelola ruangan dan aset',
             default => 'Panel admin',
         };
     @endphp
@@ -26,7 +26,7 @@
                 <img class="brand-logo" src="{{ asset('skkmigasxbsp.png') }}" alt="Logo SKK Migas BSP">
                 <span class="brand-text">
                     <span class="brand-name">Siboru</span>
-                    <span class="brand-sub">Sistem Booking Ruangan</span>
+                    <span class="brand-sub">Sistem Peminjaman Ruangan</span>
                 </span>
             </a>
 
@@ -63,7 +63,7 @@
                             <circle cx="10" cy="10" r="7"></circle>
                             <path d="M10 6v4l2.5 1.5"></path>
                         </svg>
-                        <span>Booking</span>
+                        <span>Peminjaman</span>
                     </a>
                     <a href="{{ route('admin.loans') }}" class="nav-link" @if(request()->routeIs('admin.loans')) aria-current="page" @endif>
                         <svg class="nav-glyph" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -75,12 +75,34 @@
                     </a>
                 @endif
                 @if($isAdmin)
+                    @php($masterDataActive = request()->routeIs('admin.categories', 'admin.facilities'))
+                    <div class="nav-group">
+                        <button type="button" class="nav-link nav-toggle" data-nav-toggle aria-expanded="{{ $masterDataActive ? 'true' : 'false' }}">
+                            <svg class="nav-glyph" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <ellipse cx="10" cy="5" rx="6" ry="2.5"></ellipse>
+                                <path d="M4 5v5c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5V5"></path>
+                                <path d="M4 10v5c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5v-5"></path>
+                            </svg>
+                            <span>Kategori &amp; Fasilitas</span>
+                            <svg class="nav-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="m6 8 4 4 4-4"></path>
+                            </svg>
+                        </button>
+                        <div class="nav-sub" @if(! $masterDataActive) hidden @endif>
+                            <a href="{{ route('admin.categories') }}" class="nav-link nav-link--sub" @if(request()->routeIs('admin.categories', 'admin.categories.*')) aria-current="page" @endif>
+                                <span>Kategori</span>
+                            </a>
+                            <a href="{{ route('admin.facilities') }}" class="nav-link nav-link--sub" @if(request()->routeIs('admin.facilities', 'admin.facilities.*')) aria-current="page" @endif>
+                                <span>Fasilitas</span>
+                            </a>
+                        </div>
+                    </div>
                     <a href="{{ route('admin.locations') }}" class="nav-link" @if(request()->routeIs('admin.locations')) aria-current="page" @endif>
                         <svg class="nav-glyph" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M10 17s5-4.2 5-8a5 5 0 1 0-10 0c0 3.8 5 8 5 8Z"></path>
                             <circle cx="10" cy="9" r="1.6"></circle>
                         </svg>
-                        <span>Lokasi &amp; geofence</span>
+                        <span>Lokasi &amp; area</span>
                     </a>
                     <a href="{{ route('admin.penalties') }}" class="nav-link" @if(request()->routeIs('admin.penalties')) aria-current="page" @endif>
                         <svg class="nav-glyph" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -88,7 +110,7 @@
                             <path d="M10 8v4"></path>
                             <path d="M10 14.5v.1"></path>
                         </svg>
-                        <span>Strike &amp; suspensi</span>
+                        <span>Pelanggaran &amp; pembatasan akun</span>
                     </a>
                     <a href="{{ route('admin.reports') }}" class="nav-link" @if(request()->routeIs('admin.reports')) aria-current="page" @endif>
                         <svg class="nav-glyph" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -206,6 +228,17 @@
 
             select.addEventListener('change', syncFields);
             syncFields();
+        });
+
+        document.querySelectorAll('[data-nav-toggle]').forEach(function (button) {
+            button.addEventListener('click', function () {
+                var expanded = button.getAttribute('aria-expanded') === 'true';
+                button.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+                var submenu = button.parentElement.querySelector('.nav-sub');
+                if (submenu) {
+                    submenu.hidden = expanded;
+                }
+            });
         });
 
         document.querySelectorAll('[data-confirm]').forEach(function (form) {

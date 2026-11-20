@@ -32,7 +32,7 @@
                             <th scope="col">Nama</th>
                             <th scope="col">Jenis</th>
                             <th scope="col">Lokasi</th>
-                            <th scope="col">Detail</th>
+                            <th scope="col">Keterangan</th>
                             <th scope="col">Status</th>
                             <th scope="col">Aksi</th>
                         </tr>
@@ -43,7 +43,7 @@
                                 <td data-label="Nama">
                                     <div class="cell-title">{{ $resource->name }}</div>
                                     @if($resource->category)
-                                        <div class="cell-sub">{{ $resource->category }}</div>
+                                        <div class="cell-sub">{{ $resource->category->name }}</div>
                                     @endif
                                 </td>
                                 <td data-label="Jenis">
@@ -54,14 +54,23 @@
                                     @endif
                                 </td>
                                 <td data-label="Lokasi">{{ $resource->location->name ?? 'Belum diatur' }}</td>
-                                <td data-label="Detail">
+                                <td data-label="Keterangan">
                                     @if($resource->room)
                                         <span>Kapasitas {{ $resource->room->capacity }} orang</span>
                                     @elseif($resource->asset)
+                                        @php
+                                            $conditionLabel = match ($resource->asset->condition) {
+                                                'good' => 'Baik',
+                                                'damaged' => 'Rusak',
+                                                'lost' => 'Hilang',
+                                                'maintenance' => 'Perawatan',
+                                                default => 'Tidak diketahui',
+                                            };
+                                        @endphp
                                         <span>Kode {{ $resource->asset->code }}</span>
-                                        <div class="cell-sub">Kondisi: {{ $resource->asset->condition }}</div>
+                                        <div class="cell-sub">Kondisi: {{ $conditionLabel }}</div>
                                     @else
-                                        <span class="cell-muted">Belum ada detail</span>
+                                        <span class="cell-muted">Belum ada keterangan</span>
                                     @endif
                                 </td>
                                 <td data-label="Status">
@@ -72,8 +81,8 @@
                                 </td>
                                 <td data-label="Aksi" class="data-actions">
                                     <div class="cell-actions">
-                                        <a class="btn btn--ghost btn--sm" href="{{ route('admin.resources.edit', $resource) }}">Edit</a>
-                                        <a class="btn btn--ghost btn--sm" href="{{ route('resources.qr', $resource) }}" target="_blank" rel="noopener">QR</a>
+                                        <a class="btn btn--ghost btn--sm" href="{{ route('admin.resources.edit', $resource) }}">Ubah</a>
+                                        <a class="btn btn--ghost btn--sm" href="{{ route('resources.qr', $resource) }}" target="_blank" rel="noopener">Kode QR</a>
                                         <form method="POST" action="{{ route('admin.resources.toggle', $resource) }}">
                                             @csrf
                                             @method('PATCH')
@@ -102,14 +111,14 @@
         <div class="modal-head">
             <div>
                 <h2 class="modal-title" id="createResourceTitle">Tambah ruangan atau aset</h2>
-                <p class="modal-desc">Isi detail resource dan aturan booking agar langsung bisa dipinjam.</p>
+                <p class="modal-desc">Isi keterangan serta aturan peminjaman agar langsung bisa dipakai.</p>
             </div>
             <button type="button" class="modal-close" data-close-dialog aria-label="Tutup dialog">&times;</button>
         </div>
         <div class="modal-body">
             <form method="POST" action="{{ route('admin.resources.store') }}">
                 @csrf
-                @include('admin.partials.resource-fields', ['resource' => null, 'locations' => $locations, 'isEdit' => false])
+                @include('admin.partials.resource-fields', ['resource' => null, 'locations' => $locations, 'roomCategories' => $roomCategories, 'assetCategories' => $assetCategories, 'facilities' => $facilities, 'isEdit' => false])
 
                 <div class="form-actions">
                     <button type="button" class="btn btn--ghost" data-close-dialog>Batal</button>

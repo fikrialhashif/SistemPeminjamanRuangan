@@ -14,10 +14,10 @@
         <input class="input" type="email" id="{{ $prefix }}_email" name="email" value="{{ old('email', $user?->email) }}" required>
     </div>
     <div class="field">
-        <label class="field-label" for="{{ $prefix }}_role">Peran</label>
+        <label class="field-label" for="{{ $prefix }}_role">Hak akses</label>
         <select class="input" id="{{ $prefix }}_role" name="role_id" required>
             @foreach($roles as $role)
-                <option value="{{ $role->id }}" @selected($currentRole == $role->id)>{{ $roleLabels[$role->name->value] ?? $role->name->value }}</option>
+                <option value="{{ $role->id }}" @selected($currentRole == $role->id)>{{ $roleLabels[$role->name->value] ?? 'Hak akses tidak dikenal' }}</option>
             @endforeach
         </select>
     </div>

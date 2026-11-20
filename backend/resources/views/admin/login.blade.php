@@ -20,14 +20,14 @@
                 </a>
                 <div>
                     <h1 class="auth-title">Kelola ruangan, aset, dan izin masuk.</h1>
-                    <p class="auth-lead">Satu papan untuk antrian persetujuan, status ruangan, dan jejak keputusan admin kampus.</p>
+                    <p class="auth-lead">Satu tempat untuk melihat antrian persetujuan, status ruangan, dan keputusan admin.</p>
                 </div>
             </div>
 
             <div class="doorplate">
                 <span class="doorplate-kicker">Akses terbatas</span>
                 <div class="doorplate-name">Panel admin</div>
-                <p class="doorplate-note">Untuk approver, pengelola aset, dan admin.</p>
+                <p class="doorplate-note">Untuk penyetuju, pengelola ruangan dan aset, serta admin.</p>
                 <div class="doorplate-status">
                     <span class="dot dot--amber" aria-hidden="true"></span>
                     <span>Masuk dengan akun kantor</span>
@@ -68,7 +68,7 @@
                     <button type="submit" class="btn btn--primary btn--full auth-submit">Masuk</button>
                 </form>
 
-                <p class="auth-foot">Tidak bisa masuk? Hubungi admin sistem untuk mengatur ulang akses akun.</p>
+                <p class="auth-foot">Tidak bisa masuk? Hubungi pengelola sistem untuk mengatur ulang akses Anda.</p>
             </div>
         </section>
     </div>
