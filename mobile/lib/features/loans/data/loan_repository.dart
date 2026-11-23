@@ -55,12 +55,14 @@ class LoanRepository {
   Future<Map<String, dynamic>> returnAsset({
     required String loanId,
     required String condition,
+    String? assetCode,
     String? notes,
     String? photoPath,
   }) async {
     try {
       final form = FormData.fromMap({
         'condition': condition,
+        if (assetCode != null && assetCode.isNotEmpty) 'asset_code': assetCode,
         if (notes != null && notes.isNotEmpty) 'notes': notes,
         if (photoPath != null) 'photo': await MultipartFile.fromFile(photoPath),
       });

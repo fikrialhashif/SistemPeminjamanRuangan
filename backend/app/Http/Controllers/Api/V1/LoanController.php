@@ -7,13 +7,14 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\HandoverRequest;
 use App\Http\Requests\LoanOverrideRequest;
 use App\Http\Requests\ReturnRequest;
-use Illuminate\Support\Facades\DB;
 use App\Models\AssetLoan;
 use App\Models\ConditionReport;
 use App\Models\LoanEvent;
 use App\Services\FaceVerificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 class LoanController extends Controller
 {
@@ -39,8 +40,15 @@ class LoanController extends Controller
 
     public function handover(HandoverRequest $request, AssetLoan $assetLoan): JsonResponse
     {
+        Gate::authorize('handover', $assetLoan);
+
         if ($assetLoan->status !== LoanStatus::RESERVED) {
             return response()->json(['message' => 'Loan is not in reserved state.'], 422);
+        }
+
+        $assetCode = trim((string) $request->input('asset_code'));
+        if (! hash_equals($assetLoan->asset->code, $assetCode)) {
+            return response()->json(['message' => 'Kode aset tidak sesuai dengan pinjaman ini.'], 422);
         }
 
         $faceResult = $this->faceVerificationService->verify($request->user(), $request->input('face_image'));
@@ -62,7 +70,9 @@ class LoanController extends Controller
                 'gps_latitude' => $request->input('gps_latitude'),
                 'gps_longitude' => $request->input('gps_longitude'),
                 'gps_accuracy' => $request->input('gps_accuracy'),
-                'asset_code' => $request->input('asset_code'),
+                'asset_code' => $assetCode,
+                'scan_source' => 'static_label',
+                'asset_matched' => true,
             ],
         ]);
 
@@ -71,8 +81,14 @@ class LoanController extends Controller
 
     public function returnAsset(ReturnRequest $request, AssetLoan $assetLoan): JsonResponse
     {
+        Gate::authorize('returnAsset', $assetLoan);
+
         if (! in_array($assetLoan->status, [LoanStatus::HANDED_OVER, LoanStatus::IN_USE])) {
             return response()->json(['message' => 'Loan cannot be returned in current state.'], 422);
+        }
+
+        if ($request->filled('asset_code') && ! hash_equals($assetLoan->asset->code, trim((string) $request->input('asset_code')))) {
+            return response()->json(['message' => 'Kode aset tidak sesuai dengan pinjaman ini.'], 422);
         }
 
         $photoPath = null;
@@ -97,7 +113,14 @@ class LoanController extends Controller
             'asset_loan_id' => $assetLoan->id,
             'event_type' => 'return',
             'actor_id' => $request->user()->id,
-            'data' => ['condition' => $request->input('condition')],
+            'data' => [
+                'condition' => $request->input('condition'),
+                ...($request->filled('asset_code') ? [
+                    'asset_code' => trim((string) $request->input('asset_code')),
+                    'scan_source' => 'static_label',
+                    'asset_matched' => true,
+                ] : []),
+            ],
         ]);
 
         return response()->json($assetLoan->fresh(['asset', 'conditionReports']));
@@ -128,6 +151,8 @@ class LoanController extends Controller
 
     public function reportDamage(Request $request, AssetLoan $assetLoan): JsonResponse
     {
+        Gate::authorize('reportDamage', $assetLoan);
+
         $request->validate([
             'notes' => ['required', 'string'],
             'photo' => ['nullable', 'file', 'image', 'max:5120'],

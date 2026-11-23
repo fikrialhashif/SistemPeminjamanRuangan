@@ -88,7 +88,11 @@
                                         @if(auth()->user()->hasPermission('resources.update'))
                                             <a class="btn btn--ghost btn--sm" href="{{ route('admin.resources.edit', $resource) }}">Ubah</a>
                                         @endif
-                                        <a class="btn btn--ghost btn--sm" href="{{ route('resources.qr', $resource) }}" target="_blank" rel="noopener">Kode QR</a>
+                                        @if($resource->type->value === 'room')
+                                            <a class="btn btn--ghost btn--sm" href="{{ route('resources.qr', $resource) }}" target="_blank" rel="noopener">QR pintu</a>
+                                        @else
+                                            <a class="btn btn--ghost btn--sm" href="{{ route('resources.asset-label', $resource) }}" target="_blank" rel="noopener">Label aset</a>
+                                        @endif
                                         @if(auth()->user()->hasPermission('resources.update'))
                                             <form method="POST" action="{{ route('admin.resources.toggle', $resource) }}">
                                                 @csrf

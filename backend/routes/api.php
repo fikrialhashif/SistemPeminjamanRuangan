@@ -44,10 +44,10 @@ Route::prefix('v1')->group(function () {
         Route::delete('face', [FaceController::class, 'destroy']);
 
         Route::get('loans', [LoanController::class, 'index']);
-        Route::post('loans/{loan}/handover', [LoanController::class, 'handover']);
-        Route::post('loans/{loan}/return', [LoanController::class, 'returnAsset']);
-        Route::post('loans/{loan}/damage', [LoanController::class, 'reportDamage']);
-        Route::post('loans/{loan}/override', [LoanController::class, 'override']);
+        Route::post('loans/{assetLoan}/handover', [LoanController::class, 'handover']);
+        Route::post('loans/{assetLoan}/return', [LoanController::class, 'returnAsset']);
+        Route::post('loans/{assetLoan}/damage', [LoanController::class, 'reportDamage']);
+        Route::post('loans/{assetLoan}/override', [LoanController::class, 'override']);
 
         Route::get('me/strikes', [PenaltyController::class, 'strikes']);
         Route::get('notifications', [NotificationController::class, 'index']);

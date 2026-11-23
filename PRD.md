@@ -107,7 +107,7 @@ Aturan: otorisasi dilakukan di backend (Policy/Gate Laravel). Menyembunyikan tom
 
 ### 4.7 Check-in dan no-show (FR-CI)
 - FR-CI-1: Check-in menggabungkan QR + GPS + wajah dalam jendela waktu booking (mis. 15 menit sebelum sampai batas setelah mulai, dikonfigurasi).
-- FR-CI-2: QR tidak bisa dibagikan lewat screenshot (lihat bagian 9).
+- FR-CI-2: QR ruangan statis bertanda tangan dicetak di pintu. Screenshot tidak dicegah, jadi check-in tetap mensyaratkan booking, GPS, wajah, dan jendela waktu yang benar (lihat bagian 9).
 - FR-CI-3: Booking yang tidak di-check-in otomatis dilepas dan dicatat sebagai strike.
 - FR-CI-4: Setiap percobaan check-in dan hasilnya tersimpan.
 - AC: keputusan validitas check-in dibuat satu tempat di backend (`CheckInDecisionService`) dan mengembalikan alasan terstruktur.
@@ -160,7 +160,7 @@ Status yang menahan slot: `pending`, `approved`, `checked_in`.
 ### 6.2 Keputusan check-in valid
 Check-in valid jika **semua** terpenuhi:
 1. Booking milik user, status `approved`, dan sekarang berada di jendela check-in.
-2. QR token valid, belum kedaluwarsa, cocok dengan ruangan booking.
+2. QR pintu statis bertanda tangan valid dan cocok dengan ruangan booking.
 3. GPS: di dalam geofence (atau pengecualian aktif), akurasi dan kesegaran memadai, tidak ada flag mock, tidak ada lompatan mencurigakan.
 4. Wajah: skor di atas threshold dan liveness lolos.
 
@@ -216,13 +216,13 @@ Syarat: booking berulang memproses semua kemunculan dalam satu transaksi (atau d
 |---|---|
 | Foto atau video orang lain | Liveness acak di server + skor kualitas; kegagalan berulang jadi strike |
 | GPS palsu | Flag mock dari app, validasi akurasi/kesegaran, deteksi lompatan, validasi server; catatan: app yang di-root bisa memalsukan flag, jadi sinyal tambahan dipakai (lihat stretch goal beacon) |
-| Screenshot QR dibagikan | QR dinamis: token bertanda tangan, berumur pendek (mis. 30-60 detik), diikat ke ruangan dan booking, sekali pakai |
+| Screenshot QR dibagikan | QR statis bertanda tangan di pintu; screenshot tidak bisa dicegah, dimitigasi oleh GPS, wajah, booking, dan jendela waktu di server |
 | Pinjam akun | Enrollment wajah wajib, verifikasi wajah, deteksi perangkat berbeda |
-| Replay request | Nonce/timestamp pada request check-in, token sekali pakai |
+| Replay request | Nonce/timestamp pada request check-in; QR statis tidak sekali pakai |
 | App di-tamper | Semua keputusan di server; app hanya mengirim bukti |
 | Brute force verifikasi | Rate limit, batas percobaan, strike |
 
-Sumber QR: layar/tablet di ruangan yang menampilkan token berputar, atau QR statik per ruangan digabung dengan nonce sesi. **Perlu keputusan** (bagian 14).
+Sumber QR: stiker QR statik bertanda tangan yang dicetak sekali dan ditempel di pintu ruangan. Keputusan bagian 14 #1: stiker statis.
 
 ---
 
@@ -279,7 +279,7 @@ Agent tidak boleh memutuskan sendiri hal berikut tanpa konfirmasi; gunakan defau
 
 | # | Pertanyaan | Default sementara |
 |---|---|---|
-| 1 | Sumber QR: layar/tablet di ruangan (dinamis) atau stiker per ruangan? | QR dinamis dari tampilan web sederhana di ruangan |
+| 1 | Sumber QR: layar/tablet di ruangan (dinamis) atau stiker per ruangan? | Stiker QR statis bertanda tangan di pintu ruangan, dicetak sekali |
 | 2 | Platform Flutter: Android saja atau iOS juga? | Android dulu |
 | 3 | Satu atau banyak gedung/kampus? | Banyak lokasi dalam satu organisasi |
 | 4 | Aset dan ruangan boleh dipesan bersamaan (bundled)? | Ya, prioritas rendah |

@@ -26,7 +26,7 @@ Angka fase (0-9) sama di kedua bagian, jadi mudah dicocokkan.
 | 1 | Auth, RBAC, katalog resource | 1 minggu |
 | 2 | Booking engine inti + anti double booking | 1 minggu |
 | 3 | Approval workflow | 3-4 hari |
-| 4 | GPS lock + QR dinamis + check-in (tanpa wajah) + no-show | 1 minggu |
+| 4 | GPS lock + QR pintu statis + check-in (tanpa wajah) + no-show | 1 minggu |
 | 5 | Face recognition: service, enrollment, verifikasi, integrasi check-in | 1,5 minggu |
 | 6 | Siklus peminjaman aset | 1 minggu |
 | 7 | Penalti, notifikasi, job terjadwal | 4-5 hari |
@@ -97,8 +97,8 @@ Wajah belum ada di fase ini. `CheckInDecisionService` dibuat dengan **slot wajah
 |---|---|---|---|
 | BE-4.1 | Geofence di model location/room (titik+radius, polygon) + CRUD admin + pengecualian | FR-GPS-1,5 | Tes titik di dalam/di luar/tepat di batas |
 | BE-4.2 | `GpsValidator` server: geofence, akurasi, kesegaran, flag mock, deteksi lompatan | FR-GPS-2..4 | Tes tiap alasan penolakan dengan kode alasan terstruktur |
-| BE-4.3 | Generator dan validator QR dinamis (token bertanda tangan, TTL pendek, sekali pakai, terikat ruangan/booking) | FR-CI-2 | Tes: kedaluwarsa, dipakai dua kali, ruangan salah |
-| BE-4.4 | Tampilan QR untuk ruangan (halaman web sederhana, sesuai keputusan PRD 14 #1) | FR-CI-2 | QR berganti sesuai TTL |
+| BE-4.3 | Generator dan validator QR statis bertanda tangan (HMAC, terikat `resource_id`) + token identitas aset terpisah | FR-CI-2 | Tes: tanda tangan salah, ruangan salah, QR aset ditolak check-in |
+| BE-4.4 | Halaman QR pintu dan label aset yang bisa dicetak, tanpa rotasi | FR-CI-2, FR-LN-2 | QR sama tiap dibuka; tombol cetak tersedia |
 | BE-4.5 | `CheckInDecisionService` + endpoint check-in + tabel `check_in_attempts` | FR-CI-1,4 | Hasil terstruktur `accepted/rejected/needs_manual_review`, semua percobaan tercatat |
 | BE-4.6 | Job pelepasan no-show otomatis (idempoten) | FR-CI-3 | Dijalankan dua kali tidak menggandakan efek |
 | BE-4.7 | Kalibrasi ambang akurasi GPS dari hasil uji lapangan (butuh FL-4.3) | FR-GPS-2 | Ambang tersimpan di `settings`, hasil di `docs/gps-field-test.md`. **[REVIEW]** uji di HP sungguhan (termasuk aplikasi mock-location) |
@@ -127,7 +127,7 @@ Catatan: liveness aktif tidak menahan deepfake atau topeng; batas ini ditulis di
 | ID | Task | Req | Acceptance criteria |
 |---|---|---|---|
 | BE-6.1 | Migration asset_loans, loan_events, condition_reports + state machine (reserved → handed_over → in_use → returned → closed) | FR-LN-1 | Transisi ilegal ditolak |
-| BE-6.2 | Handover: verifikasi wajah+lokasi peminjam, scan kode aset | FR-LN-2 | Gagal verifikasi tidak mengubah status |
+| BE-6.2 | Handover: verifikasi wajah+lokasi peminjam, pindai label QR statis aset yang dicocokkan server ke loan | FR-LN-2 | Gagal verifikasi atau kode salah tidak mengubah status |
 | BE-6.3 | Return: cek kondisi + foto (disk privat), laporan kerusakan | FR-LN-3,4 | Foto tersimpan, kondisi aset diperbarui |
 | BE-6.4 | Job tandai terlambat + pengingat | FR-LN-4 | Idempoten; memicu notifikasi dan strike (Fase 7) |
 

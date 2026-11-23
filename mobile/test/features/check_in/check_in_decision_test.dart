@@ -18,14 +18,14 @@ void main() {
     final result = {
       'result': 'rejected',
       'rejection_reasons': [
-        'qr: Token expired',
+        'qr: Resource mismatch',
         'gps: Mock GPS detected',
         'face: verification failed',
       ],
     };
 
     final message = checkInDecisionMessage(result);
-    expect(message, contains('QR sudah kedaluwarsa'));
+    expect(message, contains('QR bukan untuk ruangan booking ini'));
     expect(message, contains('Lokasi tiruan'));
     expect(message, contains('Wajah tidak sesuai'));
   });

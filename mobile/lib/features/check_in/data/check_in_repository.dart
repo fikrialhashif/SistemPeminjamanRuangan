@@ -48,7 +48,7 @@ String checkInReasonMessage(String? code) =>
           'Akurasi lokasi belum cukup. Coba pindah ke area terbuka.',
       'stale_location': 'Lokasi sudah kedaluwarsa. Ambil lokasi ulang.',
       'mock_location': 'Lokasi tiruan terdeteksi.',
-      'invalid_qr': 'QR tidak valid atau sudah kedaluwarsa.',
+      'invalid_qr': 'QR pintu tidak valid. Pastikan sesuai booking.',
       'wrong_room': 'QR bukan untuk ruangan booking ini.',
       'outside_window': 'Belum masuk waktu check-in.',
       'face_not_enrolled':
@@ -91,16 +91,10 @@ String checkInDecisionMessage(Map<String, dynamic> result) {
 String _reasonFromServer(String reason) {
   final value = reason.toLowerCase();
   if (value.contains('qr:') || value.contains('token')) {
-    if (value.contains('expired')) {
-      return 'QR sudah kedaluwarsa. Pindai ulang QR terbaru.';
-    }
-    if (value.contains('already used')) {
-      return 'QR sudah pernah dipakai. Pindai QR terbaru.';
-    }
     if (value.contains('mismatch')) {
       return 'QR bukan untuk ruangan booking ini.';
     }
-    return 'QR tidak valid. Pindai ulang QR di ruangan.';
+    return 'QR tidak valid. Pastikan QR pintu sesuai booking.';
   }
   if (value.contains('mock')) {
     return 'Lokasi tiruan terdeteksi. Matikan aplikasi mock-location.';

@@ -12,6 +12,7 @@ Route::get('/', function () {
 });
 
 Route::get('/resources/{resource}/qr', [QrDisplayController::class, 'show'])->name('resources.qr');
+Route::get('/resources/{resource}/label', [QrDisplayController::class, 'assetLabel'])->name('resources.asset-label');
 
 Route::prefix('admin')->group(function () {
     Route::get('login', [AdminController::class, 'showLoginForm'])->name('admin.login');

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../core/formatting/formatters.dart';
 import '../../../core/network/api_error.dart';
@@ -115,6 +116,7 @@ class HandoverPage extends ConsumerStatefulWidget {
 class _HandoverPageState extends ConsumerState<HandoverPage> {
   final code = TextEditingController();
   final face = TextEditingController();
+  bool scanning = false;
   bool busy = false;
   String? error;
 
@@ -149,6 +151,27 @@ class _HandoverPageState extends ConsumerState<HandoverPage> {
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
+          if (scanning)
+            SizedBox(
+              height: 220,
+              child: MobileScanner(
+                onDetect: (capture) {
+                  final value = capture.barcodes.firstOrNull?.rawValue;
+                  if (value != null && mounted) {
+                    setState(() {
+                      code.text = value;
+                      scanning = false;
+                    });
+                  }
+                },
+              ),
+            )
+          else
+            OutlinedButton.icon(
+              onPressed: () => setState(() => scanning = true),
+              icon: const Icon(Icons.qr_code_scanner),
+              label: const Text('Pindai label aset'),
+            ),
           TextField(
             controller: code,
             decoration: const InputDecoration(labelText: 'Kode aset'),
@@ -181,7 +204,9 @@ class ReturnPage extends ConsumerStatefulWidget {
 
 class _ReturnPageState extends ConsumerState<ReturnPage> {
   final notes = TextEditingController();
+  final assetCode = TextEditingController();
   String condition = 'good';
+  bool scanning = false;
   bool busy = false;
   String? error;
 
@@ -196,6 +221,9 @@ class _ReturnPageState extends ConsumerState<ReturnPage> {
           .returnAsset(
             loanId: widget.loanId,
             condition: condition,
+            assetCode: assetCode.text.trim().isEmpty
+                ? null
+                : assetCode.text.trim(),
             notes: notes.text,
           );
       if (mounted) Navigator.pop(context);
@@ -222,6 +250,33 @@ class _ReturnPageState extends ConsumerState<ReturnPage> {
             ],
             onChanged: (value) => setState(() => condition = value!),
             decoration: const InputDecoration(labelText: 'Kondisi'),
+          ),
+          if (scanning)
+            SizedBox(
+              height: 220,
+              child: MobileScanner(
+                onDetect: (capture) {
+                  final value = capture.barcodes.firstOrNull?.rawValue;
+                  if (value != null && mounted) {
+                    setState(() {
+                      assetCode.text = value;
+                      scanning = false;
+                    });
+                  }
+                },
+              ),
+            )
+          else
+            OutlinedButton.icon(
+              onPressed: () => setState(() => scanning = true),
+              icon: const Icon(Icons.qr_code_scanner),
+              label: const Text('Pindai label aset'),
+            ),
+          TextField(
+            controller: assetCode,
+            decoration: const InputDecoration(
+              labelText: 'Kode aset (opsional)',
+            ),
           ),
           TextField(
             controller: notes,
