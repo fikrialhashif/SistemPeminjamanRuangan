@@ -229,6 +229,11 @@ class FakeBackend implements HttpClientAdapter {
     if (path.endsWith('/me/strikes')) {
       return _json(<Object>[]);
     }
+    if (path.contains('/loans/') &&
+        path.endsWith('/handover') &&
+        options.method == 'POST') {
+      return _json({'id': 7, 'status': 'handed_over'});
+    }
     return _json({'message': 'Not found.'}, status: 404);
   }
 

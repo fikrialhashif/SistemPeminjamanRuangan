@@ -15,7 +15,7 @@ class ReturnRequest extends FormRequest
     {
         return [
             'condition' => ['required', 'string', 'in:good,damaged,lost'],
-            'asset_code' => ['nullable', 'string'],
+            'asset_token' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
             'photo' => ['nullable', 'file', 'image', 'max:5120'],
         ];

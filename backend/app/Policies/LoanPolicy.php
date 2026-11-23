@@ -17,12 +17,12 @@ class LoanPolicy
 
     public function handover(User $user, AssetLoan $loan): bool
     {
-        return $user->hasRole(Role::RESOURCE_MANAGER->value);
+        return $user->isAdmin() || $user->hasRole(Role::RESOURCE_MANAGER->value);
     }
 
     public function returnAsset(User $user, AssetLoan $loan): bool
     {
-        return $user->hasRole(Role::RESOURCE_MANAGER->value);
+        return $user->isAdmin() || $user->hasRole(Role::RESOURCE_MANAGER->value);
     }
 
     public function reportDamage(User $user, AssetLoan $loan): bool

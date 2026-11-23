@@ -100,7 +100,7 @@ class QrStaticLabelTest extends TestCase
         $this->assertTrue($booking->checkInAttempts()->latest()->firstOrFail()->qr_valid);
     }
 
-    public function test_handover_requires_manager_and_matching_asset_code(): void
+    public function test_handover_requires_manager_and_valid_asset_token(): void
     {
         $this->mock(FaceVerificationService::class)
             ->shouldReceive('verify')
@@ -112,8 +112,9 @@ class QrStaticLabelTest extends TestCase
         $borrower = $this->userWithRole(RoleEnum::MEMBER);
         $loan = $this->loan($resource, $asset, $borrower);
 
+        $tokens = app(QrTokenService::class);
         $payload = [
-            'asset_code' => 'CAM-001',
+            'asset_token' => $tokens->generateForAsset($asset)['token'],
             'face_image' => 'face.jpg',
             'gps_latitude' => -6.2,
             'gps_longitude' => 106.8,
@@ -124,8 +125,17 @@ class QrStaticLabelTest extends TestCase
             ->postJson("/api/v1/loans/{$loan->id}/handover", $payload)
             ->assertForbidden();
 
+        $otherAsset = $this->asset('Kamera lain', 'CAM-999')->asset;
         $this->actingAs($manager)
-            ->postJson("/api/v1/loans/{$loan->id}/handover", ['asset_code' => 'CAM-999'] + $payload)
+            ->postJson("/api/v1/loans/{$loan->id}/handover", [
+                'asset_token' => $tokens->generateForAsset($otherAsset)['token'],
+            ] + $payload)
+            ->assertStatus(422);
+
+        $this->actingAs($manager)
+            ->postJson("/api/v1/loans/{$loan->id}/handover", [
+                'asset_token' => $tokens->generate($resource->id)['token'],
+            ] + $payload)
             ->assertStatus(422);
 
         $this->actingAs($manager)
@@ -133,6 +143,40 @@ class QrStaticLabelTest extends TestCase
             ->assertOk();
 
         $this->assertSame('handed_over', $loan->fresh()->status->value);
+        $this->assertSame('in_use', $asset->fresh()->status);
+        $this->assertSame('static_label', $loan->events()->firstOrFail()->data['scan_source']);
+    }
+
+    public function test_return_validates_asset_token_and_restores_asset(): void
+    {
+        $resource = $this->asset('Kamera DSLR', 'CAM-001');
+        $asset = $resource->asset;
+        $manager = $this->userWithRole(RoleEnum::RESOURCE_MANAGER);
+        $borrower = $this->userWithRole(RoleEnum::MEMBER);
+        $loan = $this->loan($resource, $asset, $borrower);
+        $loan->update(['status' => 'handed_over', 'handed_over_at' => now()]);
+        $asset->update(['status' => 'in_use']);
+
+        $tokens = app(QrTokenService::class);
+        $otherAsset = $this->asset('Kamera lain', 'CAM-999')->asset;
+
+        $this->actingAs($manager)
+            ->postJson("/api/v1/loans/{$loan->id}/return", [
+                'condition' => 'good',
+                'asset_token' => $tokens->generateForAsset($otherAsset)['token'],
+            ])
+            ->assertStatus(422);
+
+        $this->actingAs($manager)
+            ->postJson("/api/v1/loans/{$loan->id}/return", [
+                'condition' => 'good',
+                'asset_token' => $tokens->generateForAsset($asset)['token'],
+            ])
+            ->assertOk();
+
+        $this->assertSame('returned', $loan->fresh()->status->value);
+        $this->assertSame('available', $asset->fresh()->status);
+        $this->assertSame('good', $asset->fresh()->condition);
         $this->assertSame('static_label', $loan->events()->firstOrFail()->data['scan_source']);
     }
 

@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Enums\BookingStatus;
 use App\Enums\CheckInResult;
+use App\Models\Approval;
+use App\Models\Asset;
 use App\Models\Booking;
 use App\Models\CheckInAttempt;
 use App\Models\FaceEnrollment;
@@ -11,6 +13,7 @@ use App\Models\Location;
 use App\Models\Resource;
 use App\Models\Setting;
 use App\Models\User;
+use App\Services\ApprovalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -31,6 +34,41 @@ class BookingApprovalAndDetailTest extends TestCase
         $this->assertSame(BookingStatus::PENDING, $booking->status);
         $this->assertCount(1, $booking->approvals);
         $this->assertSame('pending', $booking->approvals->first()->status);
+    }
+
+    public function test_approving_asset_booking_creates_reserved_asset_loan(): void
+    {
+        $user = User::factory()->create();
+        $approver = User::factory()->create();
+        $resource = Resource::create([
+            'name' => 'Kamera DSLR-01',
+            'type' => 'asset',
+            'is_active' => true,
+        ]);
+        Asset::create([
+            'resource_id' => $resource->id,
+            'code' => 'CAM-001',
+            'condition' => 'good',
+        ]);
+
+        $response = $this->actingAs($user)
+            ->postJson('/api/v1/bookings', $this->payload($resource))
+            ->assertCreated();
+
+        $booking = Booking::findOrFail($response->json('id'));
+        app(ApprovalService::class)->approve(
+            Approval::query()->where('booking_id', $booking->id)->firstOrFail(),
+            $approver,
+        );
+
+        $this->assertSame(BookingStatus::APPROVED, $booking->fresh()->status);
+        $this->assertSame(1, $booking->assetLoan()->count());
+
+        $loan = $booking->assetLoan()->firstOrFail();
+        $this->assertSame('reserved', $loan->status->value);
+        $this->assertSame('CAM-001', $loan->asset->code);
+        $this->assertSame($user->id, $loan->user_id);
+        $this->assertNotNull($loan->due_at);
     }
 
     public function test_check_in_is_rejected_before_approver_approval(): void

@@ -11,6 +11,7 @@ use App\Models\AssetLoan;
 use App\Models\ConditionReport;
 use App\Models\LoanEvent;
 use App\Services\FaceVerificationService;
+use App\Services\QrTokenService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +21,7 @@ class LoanController extends Controller
 {
     public function __construct(
         protected FaceVerificationService $faceVerificationService,
+        protected QrTokenService $qrTokenService,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -46,9 +48,18 @@ class LoanController extends Controller
             return response()->json(['message' => 'Loan is not in reserved state.'], 422);
         }
 
-        $assetCode = trim((string) $request->input('asset_code'));
-        if (! hash_equals($assetLoan->asset->code, $assetCode)) {
-            return response()->json(['message' => 'Kode aset tidak sesuai dengan pinjaman ini.'], 422);
+        $tokenResult = $this->qrTokenService->validateForAsset(
+            (string) $request->input('asset_token'),
+            $assetLoan->asset->code,
+        );
+
+        if (! $tokenResult['valid']) {
+            return response()->json([
+                'message' => $tokenResult['reason'] === 'Asset mismatch'
+                    ? 'Kode aset tidak sesuai dengan pinjaman ini.'
+                    : 'QR aset tidak valid.',
+                'reason' => $tokenResult['reason'],
+            ], 422);
         }
 
         $faceResult = $this->faceVerificationService->verify($request->user(), $request->input('face_image'));
@@ -57,24 +68,30 @@ class LoanController extends Controller
             return response()->json(['message' => 'Face verification failed.'], 422);
         }
 
-        $assetLoan->update([
-            'status' => LoanStatus::HANDED_OVER,
-            'handed_over_at' => now(),
-        ]);
+        $assetCode = $assetLoan->asset->code;
 
-        LoanEvent::create([
-            'asset_loan_id' => $assetLoan->id,
-            'event_type' => 'handover',
-            'actor_id' => $request->user()->id,
-            'data' => [
-                'gps_latitude' => $request->input('gps_latitude'),
-                'gps_longitude' => $request->input('gps_longitude'),
-                'gps_accuracy' => $request->input('gps_accuracy'),
-                'asset_code' => $assetCode,
-                'scan_source' => 'static_label',
-                'asset_matched' => true,
-            ],
-        ]);
+        DB::transaction(function () use ($assetLoan, $request, $assetCode) {
+            $assetLoan->update([
+                'status' => LoanStatus::HANDED_OVER,
+                'handed_over_at' => now(),
+            ]);
+
+            $assetLoan->asset->update(['status' => 'in_use']);
+
+            LoanEvent::create([
+                'asset_loan_id' => $assetLoan->id,
+                'event_type' => 'handover',
+                'actor_id' => $request->user()->id,
+                'data' => [
+                    'gps_latitude' => $request->input('gps_latitude'),
+                    'gps_longitude' => $request->input('gps_longitude'),
+                    'gps_accuracy' => $request->input('gps_accuracy'),
+                    'asset_code' => $assetCode,
+                    'scan_source' => 'static_label',
+                    'asset_matched' => true,
+                ],
+            ]);
+        });
 
         return response()->json($assetLoan->fresh(['asset', 'events']));
     }
@@ -87,8 +104,27 @@ class LoanController extends Controller
             return response()->json(['message' => 'Loan cannot be returned in current state.'], 422);
         }
 
-        if ($request->filled('asset_code') && ! hash_equals($assetLoan->asset->code, trim((string) $request->input('asset_code')))) {
-            return response()->json(['message' => 'Kode aset tidak sesuai dengan pinjaman ini.'], 422);
+        $scanData = [];
+        if ($request->filled('asset_token')) {
+            $tokenResult = $this->qrTokenService->validateForAsset(
+                (string) $request->input('asset_token'),
+                $assetLoan->asset->code,
+            );
+
+            if (! $tokenResult['valid']) {
+                return response()->json([
+                    'message' => $tokenResult['reason'] === 'Asset mismatch'
+                        ? 'Kode aset tidak sesuai dengan pinjaman ini.'
+                        : 'QR aset tidak valid.',
+                    'reason' => $tokenResult['reason'],
+                ], 422);
+            }
+
+            $scanData = [
+                'asset_code' => $assetLoan->asset->code,
+                'scan_source' => 'static_label',
+                'asset_matched' => true,
+            ];
         }
 
         $photoPath = null;
@@ -96,32 +132,35 @@ class LoanController extends Controller
             $photoPath = $request->file('photo')->store('condition-reports', 'public');
         }
 
-        $assetLoan->update([
-            'status' => LoanStatus::RETURNED,
-            'returned_at' => now(),
-        ]);
+        DB::transaction(function () use ($assetLoan, $request, $photoPath, $scanData) {
+            $assetLoan->update([
+                'status' => LoanStatus::RETURNED,
+                'returned_at' => now(),
+            ]);
 
-        ConditionReport::create([
-            'asset_loan_id' => $assetLoan->id,
-            'reporter_id' => $request->user()->id,
-            'condition' => $request->input('condition'),
-            'notes' => $request->input('notes'),
-            'photo_path' => $photoPath,
-        ]);
-
-        LoanEvent::create([
-            'asset_loan_id' => $assetLoan->id,
-            'event_type' => 'return',
-            'actor_id' => $request->user()->id,
-            'data' => [
+            ConditionReport::create([
+                'asset_loan_id' => $assetLoan->id,
+                'reporter_id' => $request->user()->id,
                 'condition' => $request->input('condition'),
-                ...($request->filled('asset_code') ? [
-                    'asset_code' => trim((string) $request->input('asset_code')),
-                    'scan_source' => 'static_label',
-                    'asset_matched' => true,
-                ] : []),
-            ],
-        ]);
+                'notes' => $request->input('notes'),
+                'photo_path' => $photoPath,
+            ]);
+
+            LoanEvent::create([
+                'asset_loan_id' => $assetLoan->id,
+                'event_type' => 'return',
+                'actor_id' => $request->user()->id,
+                'data' => [
+                    'condition' => $request->input('condition'),
+                    ...$scanData,
+                ],
+            ]);
+
+            $assetLoan->asset->update([
+                'condition' => $request->input('condition'),
+                'status' => 'available',
+            ]);
+        });
 
         return response()->json($assetLoan->fresh(['asset', 'conditionReports']));
     }

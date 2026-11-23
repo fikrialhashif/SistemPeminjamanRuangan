@@ -29,7 +29,7 @@ class LoanRepository {
 
   Future<Map<String, dynamic>> handover({
     required String loanId,
-    required String assetCode,
+    required String assetToken,
     required String faceImage,
     required double latitude,
     required double longitude,
@@ -39,7 +39,7 @@ class LoanRepository {
       final response = await _dio.post(
         '/loans/$loanId/handover',
         data: {
-          'asset_code': assetCode,
+          'asset_token': assetToken,
           'face_image': faceImage,
           'gps_latitude': latitude,
           'gps_longitude': longitude,
@@ -55,14 +55,15 @@ class LoanRepository {
   Future<Map<String, dynamic>> returnAsset({
     required String loanId,
     required String condition,
-    String? assetCode,
+    String? assetToken,
     String? notes,
     String? photoPath,
   }) async {
     try {
       final form = FormData.fromMap({
         'condition': condition,
-        if (assetCode != null && assetCode.isNotEmpty) 'asset_code': assetCode,
+        if (assetToken != null && assetToken.isNotEmpty)
+          'asset_token': assetToken,
         if (notes != null && notes.isNotEmpty) 'notes': notes,
         if (photoPath != null) 'photo': await MultipartFile.fromFile(photoPath),
       });

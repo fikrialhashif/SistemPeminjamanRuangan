@@ -108,12 +108,13 @@ class UserQuickAccessSheet extends ConsumerWidget {
               subtitle: 'Cek riwayat pelanggaran',
               onTap: () => _open(context, '/penalties'),
             ),
-            _QuickItem(
-              icon: Icons.inventory_2_outlined,
-              title: 'Peminjaman aset',
-              subtitle: 'Daftar inventaris alat',
-              onTap: () => _open(context, '/manager/loans'),
-            ),
+            if (UserRole.shouldShowLoans(user))
+              _QuickItem(
+                icon: Icons.inventory_2_outlined,
+                title: 'Peminjaman aset',
+                subtitle: 'Serah-terima dan pengembalian aset',
+                onTap: () => _open(context, '/manager/loans'),
+              ),
             const Divider(height: 22),
             _QuickItem(
               icon: Icons.logout_rounded,

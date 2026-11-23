@@ -114,7 +114,7 @@ Aturan: otorisasi dilakukan di backend (Policy/Gate Laravel). Menyembunyikan tom
 
 ### 4.8 Siklus peminjaman aset (FR-LN)
 - FR-LN-1: Status: `reserved`, `handed_over`, `in_use`, `returned`, `closed`. Transisi di luar aturan ditolak.
-- FR-LN-2: Serah-terima: wajah dan lokasi peminjam diverifikasi, manager memindai kode aset.
+- FR-LN-2: Serah-terima: wajah dan lokasi peminjam diverifikasi, resource manager memindai label QR statis aset; backend memvalidasi token dan mencocokkannya ke loan.
 - FR-LN-3: Pengembalian: cek kondisi dengan foto.
 - FR-LN-4: Pengingat keterlambatan, laporan kerusakan.
 - AC: tiap transisi mencatat aktor, waktu, dan bukti (foto, hasil verifikasi).

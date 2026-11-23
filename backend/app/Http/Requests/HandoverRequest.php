@@ -18,7 +18,7 @@ class HandoverRequest extends FormRequest
             'gps_latitude' => ['required', 'numeric'],
             'gps_longitude' => ['required', 'numeric'],
             'gps_accuracy' => ['required', 'numeric'],
-            'asset_code' => ['required', 'string'],
+            'asset_token' => ['required', 'string'],
         ];
     }
 }

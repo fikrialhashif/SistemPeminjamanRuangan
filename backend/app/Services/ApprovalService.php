@@ -3,7 +3,11 @@
 namespace App\Services;
 
 use App\Enums\BookingStatus;
+use App\Enums\LoanStatus;
+use App\Enums\ResourceType;
 use App\Models\Approval;
+use App\Models\AssetLoan;
+use App\Models\Booking;
 use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Validation\ValidationException;
@@ -29,7 +33,27 @@ class ApprovalService
 
         if ($allApproved) {
             $booking->update(['status' => BookingStatus::APPROVED]);
+            $this->ensureAssetLoan($booking);
         }
+    }
+
+    private function ensureAssetLoan(Booking $booking): void
+    {
+        $resource = $booking->resource;
+
+        if ($resource === null || $resource->type !== ResourceType::ASSET || $resource->asset === null) {
+            return;
+        }
+
+        AssetLoan::firstOrCreate(
+            ['booking_id' => $booking->id],
+            [
+                'asset_id' => $resource->asset->id,
+                'user_id' => $booking->user_id,
+                'status' => LoanStatus::RESERVED,
+                'due_at' => $booking->ends_at,
+            ],
+        );
     }
 
     public function reject(Approval $approval, User $approver, ?string $notes = null): void
