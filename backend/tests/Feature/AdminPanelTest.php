@@ -231,6 +231,7 @@ class AdminPanelTest extends TestCase
             'admin.facilities',
             'admin.settings',
             'admin.users',
+            'admin.access',
             'admin.penalties',
             'admin.bookings',
             'admin.loans',

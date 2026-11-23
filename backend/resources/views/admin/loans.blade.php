@@ -95,12 +95,12 @@
                                     @endif
                                 </td>
                                 <td data-label="Aksi" class="data-actions">
-                                    @if($loan->status->value === 'reserved')
+                                    @if($loan->status->value === 'reserved' && auth()->user()->hasPermission('loans.update'))
                                         <form method="POST" action="{{ route('admin.loans.handover', $loan) }}" data-confirm="Tandai aset ini sudah diserahkan?">
                                             @csrf
                                             <button type="submit" class="btn btn--primary btn--sm">Serahkan</button>
                                         </form>
-                                    @elseif(in_array($loan->status->value, ['handed_over', 'in_use']))
+                                    @elseif(in_array($loan->status->value, ['handed_over', 'in_use']) && auth()->user()->hasPermission('loans.update'))
                                         <form method="POST" action="{{ route('admin.loans.return', $loan) }}" class="inline-form">
                                             @csrf
                                             <select class="input input--sm" name="condition" required>

@@ -81,7 +81,7 @@
                                             <button type="submit" formaction="{{ route('admin.approvals.reject', $approval) }}" class="btn btn--reject btn--sm">Tolak</button>
                                         </form>
                                     @else
-                                        <span class="cell-muted">Hanya penyetuju yang dapat memutuskan.</span>
+                                        <span class="cell-muted">Anda tidak punya izin untuk memutuskan.</span>
                                     @endif
                                 </td>
                             </tr>

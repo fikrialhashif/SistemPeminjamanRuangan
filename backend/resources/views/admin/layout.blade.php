@@ -12,7 +12,6 @@
     @php
         $roleName = auth()->user()->roles->first()?->name;
         $isAdmin = auth()->user()->isAdmin();
-        $isResourceManager = auth()->user()->hasRole('resource_manager');
         $roleLabel = match ($roleName) {
             'admin' => 'Admin',
             'approver' => 'Penyetuju',
@@ -40,15 +39,17 @@
                     </svg>
                     <span>Ringkasan</span>
                 </a>
-                <a href="{{ route('admin.approvals') }}" class="nav-link" @if(request()->routeIs('admin.approvals')) aria-current="page" @endif>
-                    <svg class="nav-glyph" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M7 3.5h6"></path>
-                        <path d="M5 5.5h10a1 1 0 0 1 1 1V16a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6.5a1 1 0 0 1 1-1Z"></path>
-                        <path d="m7.5 11 1.8 1.8 3.4-3.6"></path>
-                    </svg>
-                    <span>Persetujuan</span>
-                </a>
-                @if($isAdmin || $isResourceManager)
+                @if(auth()->user()->hasPermission('approvals.view'))
+                    <a href="{{ route('admin.approvals') }}" class="nav-link" @if(request()->routeIs('admin.approvals')) aria-current="page" @endif>
+                        <svg class="nav-glyph" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M7 3.5h6"></path>
+                            <path d="M5 5.5h10a1 1 0 0 1 1 1V16a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6.5a1 1 0 0 1 1-1Z"></path>
+                            <path d="m7.5 11 1.8 1.8 3.4-3.6"></path>
+                        </svg>
+                        <span>Persetujuan</span>
+                    </a>
+                @endif
+                @if(auth()->user()->hasPermission('resources.view'))
                     <a href="{{ route('admin.resources') }}" class="nav-link" @if(request()->routeIs('admin.resources', 'admin.resources.edit')) aria-current="page" @endif>
                         <svg class="nav-glyph" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M4 17V3.5h8V17"></path>
@@ -58,6 +59,8 @@
                         </svg>
                         <span>Ruangan &amp; aset</span>
                     </a>
+                @endif
+                @if(auth()->user()->hasPermission('bookings.view'))
                     <a href="{{ route('admin.bookings') }}" class="nav-link" @if(request()->routeIs('admin.bookings')) aria-current="page" @endif>
                         <svg class="nav-glyph" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <circle cx="10" cy="10" r="7"></circle>
@@ -65,6 +68,8 @@
                         </svg>
                         <span>Peminjaman</span>
                     </a>
+                @endif
+                @if(auth()->user()->hasPermission('loans.view'))
                     <a href="{{ route('admin.loans') }}" class="nav-link" @if(request()->routeIs('admin.loans')) aria-current="page" @endif>
                         <svg class="nav-glyph" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M4 6.5h12v10H4z"></path>
@@ -74,7 +79,7 @@
                         <span>Peminjaman aset</span>
                     </a>
                 @endif
-                @if($isAdmin)
+                @if(auth()->user()->hasPermission('categories.view') || auth()->user()->hasPermission('facilities.view'))
                     @php($masterDataActive = request()->routeIs('admin.categories', 'admin.facilities'))
                     <div class="nav-group">
                         <button type="button" class="nav-link nav-toggle" data-nav-toggle aria-expanded="{{ $masterDataActive ? 'true' : 'false' }}">
@@ -89,14 +94,20 @@
                             </svg>
                         </button>
                         <div class="nav-sub" @if(! $masterDataActive) hidden @endif>
-                            <a href="{{ route('admin.categories') }}" class="nav-link nav-link--sub" @if(request()->routeIs('admin.categories', 'admin.categories.*')) aria-current="page" @endif>
-                                <span>Kategori</span>
-                            </a>
-                            <a href="{{ route('admin.facilities') }}" class="nav-link nav-link--sub" @if(request()->routeIs('admin.facilities', 'admin.facilities.*')) aria-current="page" @endif>
-                                <span>Fasilitas</span>
-                            </a>
+                            @if(auth()->user()->hasPermission('categories.view'))
+                                <a href="{{ route('admin.categories') }}" class="nav-link nav-link--sub" @if(request()->routeIs('admin.categories', 'admin.categories.*')) aria-current="page" @endif>
+                                    <span>Kategori</span>
+                                </a>
+                            @endif
+                            @if(auth()->user()->hasPermission('facilities.view'))
+                                <a href="{{ route('admin.facilities') }}" class="nav-link nav-link--sub" @if(request()->routeIs('admin.facilities', 'admin.facilities.*')) aria-current="page" @endif>
+                                    <span>Fasilitas</span>
+                                </a>
+                            @endif
                         </div>
                     </div>
+                @endif
+                @if(auth()->user()->hasPermission('locations.view'))
                     <a href="{{ route('admin.locations') }}" class="nav-link" @if(request()->routeIs('admin.locations')) aria-current="page" @endif>
                         <svg class="nav-glyph" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M10 17s5-4.2 5-8a5 5 0 1 0-10 0c0 3.8 5 8 5 8Z"></path>
@@ -104,6 +115,8 @@
                         </svg>
                         <span>Lokasi &amp; area</span>
                     </a>
+                @endif
+                @if(auth()->user()->hasPermission('penalties.view'))
                     <a href="{{ route('admin.penalties') }}" class="nav-link" @if(request()->routeIs('admin.penalties')) aria-current="page" @endif>
                         <svg class="nav-glyph" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M10 3 3.5 16.5h13L10 3Z"></path>
@@ -112,6 +125,8 @@
                         </svg>
                         <span>Pelanggaran &amp; pembatasan akun</span>
                     </a>
+                @endif
+                @if(auth()->user()->hasPermission('reports.view'))
                     <a href="{{ route('admin.reports') }}" class="nav-link" @if(request()->routeIs('admin.reports')) aria-current="page" @endif>
                         <svg class="nav-glyph" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M4 16.5V10"></path>
@@ -121,6 +136,8 @@
                         </svg>
                         <span>Laporan</span>
                     </a>
+                @endif
+                @if(auth()->user()->hasPermission('users.view'))
                     <a href="{{ route('admin.users') }}" class="nav-link" @if(request()->routeIs('admin.users')) aria-current="page" @endif>
                         <svg class="nav-glyph" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <circle cx="8" cy="7" r="2.5"></circle>
@@ -130,6 +147,19 @@
                         </svg>
                         <span>Pengguna</span>
                     </a>
+                @endif
+                @if($isAdmin)
+                    <a href="{{ route('admin.access') }}" class="nav-link" @if(request()->routeIs('admin.access')) aria-current="page" @endif>
+                        <svg class="nav-glyph" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <circle cx="7" cy="10" r="3"></circle>
+                            <path d="M10 10h7"></path>
+                            <path d="M14 10v3"></path>
+                            <path d="M17 10v2"></path>
+                        </svg>
+                        <span>Manajemen akses</span>
+                    </a>
+                @endif
+                @if(auth()->user()->hasPermission('settings.view'))
                     <a href="{{ route('admin.settings') }}" class="nav-link" @if(request()->routeIs('admin.settings')) aria-current="page" @endif>
                         <svg class="nav-glyph" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <circle cx="10" cy="10" r="2.5"></circle>
@@ -138,15 +168,17 @@
                         <span>Pengaturan</span>
                     </a>
                 @endif
-                <a href="{{ route('admin.audit') }}" class="nav-link" @if(request()->routeIs('admin.audit')) aria-current="page" @endif>
-                    <svg class="nav-glyph" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M3.5 5.5h13"></path>
-                        <path d="M3.5 10h13"></path>
-                        <path d="M3.5 14.5h8"></path>
-                        <circle cx="15.5" cy="14.5" r="1.2"></circle>
-                    </svg>
-                    <span>Riwayat aktivitas</span>
-                </a>
+                @if(auth()->user()->hasPermission('audit.view'))
+                    <a href="{{ route('admin.audit') }}" class="nav-link" @if(request()->routeIs('admin.audit')) aria-current="page" @endif>
+                        <svg class="nav-glyph" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M3.5 5.5h13"></path>
+                            <path d="M3.5 10h13"></path>
+                            <path d="M3.5 14.5h8"></path>
+                            <circle cx="15.5" cy="14.5" r="1.2"></circle>
+                        </svg>
+                        <span>Riwayat aktivitas</span>
+                    </a>
+                @endif
             </nav>
 
             <div class="rail-foot">

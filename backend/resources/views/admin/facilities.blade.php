@@ -13,7 +13,9 @@
                 <span class="plate-stat-value">{{ number_format($facilities->count(), 0, ',', '.') }}</span>
                 <span class="plate-stat-label">fasilitas</span>
             </div>
-            <button type="button" class="btn btn--onplate" data-open-dialog="createFacility">Tambah fasilitas</button>
+            @if(auth()->user()->hasPermission('facilities.create'))
+                <button type="button" class="btn btn--onplate" data-open-dialog="createFacility">Tambah fasilitas</button>
+            @endif
         </div>
     </header>
 
@@ -22,7 +24,9 @@
             <div class="empty">
                 <p class="empty-title">Belum ada fasilitas.</p>
                 <p>Tambahkan fasilitas seperti proyektor, papan tulis, atau pendingin udara.</p>
-                <button type="button" class="btn btn--primary" data-open-dialog="createFacility">Tambah fasilitas pertama</button>
+                @if(auth()->user()->hasPermission('facilities.create'))
+                    <button type="button" class="btn btn--primary" data-open-dialog="createFacility">Tambah fasilitas pertama</button>
+                @endif
             </div>
         @else
             <div class="table-wrap">
@@ -41,12 +45,16 @@
                                 </td>
                                 <td data-label="Aksi" class="data-actions">
                                     <div class="cell-actions">
-                                        <button type="button" class="btn btn--ghost btn--sm" data-open-dialog="editFacility{{ $facility->id }}">Ubah</button>
-                                        <form method="POST" action="{{ route('admin.facilities.destroy', $facility) }}" data-confirm="Hapus fasilitas {{ $facility->name }}?">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="btn btn--reject btn--sm">Hapus</button>
-                                        </form>
+                                        @if(auth()->user()->hasPermission('facilities.update'))
+                                            <button type="button" class="btn btn--ghost btn--sm" data-open-dialog="editFacility{{ $facility->id }}">Ubah</button>
+                                        @endif
+                                        @if(auth()->user()->hasPermission('facilities.delete'))
+                                            <form method="POST" action="{{ route('admin.facilities.destroy', $facility) }}" data-confirm="Hapus fasilitas {{ $facility->name }}?">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn--reject btn--sm">Hapus</button>
+                                            </form>
+                                        @endif
                                     </div>
                                 </td>
                             </tr>

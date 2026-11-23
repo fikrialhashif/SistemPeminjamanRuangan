@@ -13,7 +13,9 @@
                 <span class="plate-stat-value">{{ number_format($users->total(), 0, ',', '.') }}</span>
                 <span class="plate-stat-label">akun</span>
             </div>
-            <button type="button" class="btn btn--onplate" data-open-dialog="createUser">Tambah pengguna</button>
+            @if(auth()->user()->hasPermission('users.create'))
+                <button type="button" class="btn btn--onplate" data-open-dialog="createUser">Tambah pengguna</button>
+            @endif
         </div>
     </header>
 
@@ -72,7 +74,11 @@
                                 </td>
                                 <td data-label="Dibuat">{{ $user->created_at->locale('id')->isoFormat('D MMM Y') }}</td>
                                 <td data-label="Aksi" class="data-actions">
-                                    <button type="button" class="btn btn--ghost btn--sm" data-open-dialog="editUser{{ $user->id }}">Ubah</button>
+                                    @if(auth()->user()->hasPermission('users.update'))
+                                        <button type="button" class="btn btn--ghost btn--sm" data-open-dialog="editUser{{ $user->id }}">Ubah</button>
+                                    @else
+                                        <span class="cell-muted">&mdash;</span>
+                                    @endif
                                 </td>
                             </tr>
                         @endforeach

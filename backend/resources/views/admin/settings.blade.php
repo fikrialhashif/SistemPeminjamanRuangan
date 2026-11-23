@@ -4,6 +4,7 @@
 
 @section('content')
     @php
+        $canUpdate = auth()->user()->hasPermission('settings.update');
         $visibleDefinitions = collect($definitions)
             ->reject(fn (array $definition): bool => $definition['key'] === 'waitlist_offer_minutes')
             ->map(fn (array $definition): array => [
@@ -38,7 +39,7 @@
                                 <div class="field">
                                     @if($definition['type'] === 'boolean')
                                         <label class="check">
-                                            <input type="checkbox" name="settings[{{ $key }}]" value="1" @checked(old('settings.'.$key, $values[$key]))>
+                                            <input type="checkbox" name="settings[{{ $key }}]" value="1" @checked(old('settings.'.$key, $values[$key])) @disabled(! $canUpdate)>
                                             <span>
                                                 <span class="field-label">{{ $definition['label'] }}</span>
                                                 <span class="field-hint">{{ $definition['hint'] }}</span>
@@ -53,6 +54,7 @@
                                             name="settings[{{ $key }}]"
                                             value="{{ old('settings.'.$key, $values[$key]) }}"
                                             @if($definition['type'] !== 'string') step="{{ $definition['type'] === 'float' ? '0.01' : '1' }}" @endif
+                                            @disabled(! $canUpdate)
                                         >
                                         <span class="field-hint">{{ $definition['hint'] }}</span>
                                     @endif
@@ -64,8 +66,12 @@
             @endforeach
         </div>
 
-        <div class="form-actions">
-            <button type="submit" class="btn btn--primary">Simpan pengaturan</button>
-        </div>
+        @if($canUpdate)
+            <div class="form-actions">
+                <button type="submit" class="btn btn--primary">Simpan pengaturan</button>
+            </div>
+        @else
+            <p class="field-hint">Anda hanya memiliki akses lihat untuk pengaturan.</p>
+        @endif
     </form>
 @endsection

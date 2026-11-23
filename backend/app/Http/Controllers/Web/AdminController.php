@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Web;
 
+use App\Enums\Permission;
 use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Models\Approval;
@@ -79,7 +80,9 @@ class AdminController extends Controller
 
     public function approvals(Request $request)
     {
-        $canDecide = $this->canDecideApprovals($request);
+        $this->ensurePermission(Permission::APPROVALS_VIEW);
+
+        $canDecide = $request->user()->hasPermission(Permission::APPROVALS_UPDATE);
 
         $approvals = Approval::actionable()
             ->with(['booking.user', 'booking.resource'])
@@ -91,7 +94,7 @@ class AdminController extends Controller
 
     public function approve(Request $request, Approval $approval, ApprovalService $approvalService)
     {
-        $this->ensureCanDecideApprovals($request);
+        $this->ensurePermission(Permission::APPROVALS_UPDATE);
 
         try {
             $approvalService->approve($approval, $request->user(), $request->input('notes'));
@@ -104,7 +107,7 @@ class AdminController extends Controller
 
     public function reject(Request $request, Approval $approval, ApprovalService $approvalService)
     {
-        $this->ensureCanDecideApprovals($request);
+        $this->ensurePermission(Permission::APPROVALS_UPDATE);
 
         try {
             $approvalService->reject($approval, $request->user(), $request->input('notes'));
@@ -115,20 +118,9 @@ class AdminController extends Controller
         return back()->with('success', 'Permintaan ditolak.');
     }
 
-    private function canDecideApprovals(Request $request): bool
-    {
-        return $request->user()->isAdmin()
-            || $request->user()->hasRole(Role::APPROVER->value);
-    }
-
-    private function ensureCanDecideApprovals(Request $request): void
-    {
-        abort_unless($this->canDecideApprovals($request), 403, 'Hanya penyetuju yang bisa memutuskan permintaan.');
-    }
-
     public function resources()
     {
-        $this->ensureCanManageResources();
+        $this->ensurePermission(Permission::RESOURCES_VIEW);
 
         $resources = Resource::with(['location', 'room', 'asset', 'category'])->latest()->paginate(20);
         $locations = Location::all();
@@ -141,7 +133,7 @@ class AdminController extends Controller
 
     public function storeResource(Request $request)
     {
-        $this->ensureCanManageResources();
+        $this->ensurePermission(Permission::RESOURCES_CREATE);
 
         $validated = $request->validate($this->resourceValidationRules($request));
 
@@ -186,7 +178,7 @@ class AdminController extends Controller
 
     public function editResource(Resource $resource)
     {
-        $this->ensureCanManageResources();
+        $this->ensurePermission(Permission::RESOURCES_UPDATE);
 
         $locations = Location::orderBy('name')->get();
         $roomCategories = Category::where('type', 'room')->orderBy('name')->get();
@@ -198,7 +190,7 @@ class AdminController extends Controller
 
     public function updateResource(Request $request, Resource $resource)
     {
-        $this->ensureCanManageResources();
+        $this->ensurePermission(Permission::RESOURCES_UPDATE);
 
         $validated = $request->validate($this->resourceValidationRules($request, $resource));
 
@@ -241,7 +233,7 @@ class AdminController extends Controller
 
     public function toggleResource(Resource $resource)
     {
-        $this->ensureCanManageResources();
+        $this->ensurePermission(Permission::RESOURCES_UPDATE);
 
         $resource->update(['is_active' => ! $resource->is_active]);
 
@@ -250,7 +242,7 @@ class AdminController extends Controller
 
     public function destroyResource(Resource $resource)
     {
-        $this->ensureAdmin();
+        $this->ensurePermission(Permission::RESOURCES_DELETE);
 
         $hasActiveBookings = $resource->bookings()
             ->whereIn('status', ['pending', 'approved', 'checked_in'])
@@ -268,6 +260,8 @@ class AdminController extends Controller
 
     public function audit(Request $request)
     {
+        $this->ensurePermission(Permission::AUDIT_VIEW);
+
         $query = AuditLog::with('user')->latest();
 
         if ($request->filled('search')) {
@@ -313,6 +307,7 @@ class AdminController extends Controller
                 'Strike' => 'Pelanggaran',
                 'Suspension' => 'Pembatasan akun',
                 'Approval' => 'Persetujuan',
+                'Role' => 'Peran',
                 default => 'Data lain',
             }]);
 
@@ -356,19 +351,5 @@ class AdminController extends Controller
         }
 
         return $rules;
-    }
-
-    private function ensureCanManageResources(): void
-    {
-        abort_unless(
-            auth()->user()->isAdmin() || auth()->user()->hasRole(Role::RESOURCE_MANAGER->value),
-            403,
-            'Hanya pengelola ruangan dan aset yang bisa mengubah data ini.',
-        );
-    }
-
-    private function ensureAdmin(): void
-    {
-        abort_unless(auth()->user()->isAdmin(), 403, 'Hanya admin yang bisa melakukan aksi ini.');
     }
 }

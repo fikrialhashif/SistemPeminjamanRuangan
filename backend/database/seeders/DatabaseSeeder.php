@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\Permission;
 use App\Enums\ResourceType;
 use App\Enums\Role as RoleEnum;
 use App\Models\Category;
@@ -23,6 +24,12 @@ class DatabaseSeeder extends Seeder
     {
         $roles = collect(RoleEnum::cases())->mapWithKeys(function (RoleEnum $r) {
             return [$r->value => Role::firstOrCreate(['name' => $r->value])];
+        });
+
+        $roles->each(function (Role $role) {
+            if ($role->permissions === null) {
+                $role->update(['permissions' => Permission::defaultsForRole($role->name)]);
+            }
         });
 
         $departments = collect([

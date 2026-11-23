@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Enums\BookingStatus;
 use App\Enums\LoanStatus;
+use App\Enums\Permission;
 use App\Enums\Role as RoleEnum;
 use App\Http\Controllers\Controller;
 use App\Models\AssetLoan;
@@ -29,7 +30,7 @@ class AdminManagementController extends Controller
 {
     public function locations()
     {
-        $this->ensureAdmin();
+        $this->ensurePermission(Permission::LOCATIONS_VIEW);
 
         $locations = Location::withCount('resources')->orderBy('name')->get();
 
@@ -38,7 +39,7 @@ class AdminManagementController extends Controller
 
     public function storeLocation(Request $request)
     {
-        $this->ensureAdmin();
+        $this->ensurePermission(Permission::LOCATIONS_CREATE);
 
         Location::create($this->locationPayload($request));
 
@@ -47,7 +48,7 @@ class AdminManagementController extends Controller
 
     public function updateLocation(Request $request, Location $location)
     {
-        $this->ensureAdmin();
+        $this->ensurePermission(Permission::LOCATIONS_UPDATE);
 
         $location->update($this->locationPayload($request));
 
@@ -56,7 +57,7 @@ class AdminManagementController extends Controller
 
     public function destroyLocation(Location $location)
     {
-        $this->ensureAdmin();
+        $this->ensurePermission(Permission::LOCATIONS_DELETE);
 
         if ($location->resources()->exists()) {
             return back()->withErrors(['location' => 'Lokasi masih dipakai ruangan atau aset. Pindahkan ruangan atau aset terlebih dahulu.']);
@@ -69,7 +70,7 @@ class AdminManagementController extends Controller
 
     public function settings()
     {
-        $this->ensureAdmin();
+        $this->ensurePermission(Permission::SETTINGS_VIEW);
 
         $definitions = collect($this->settingDefinitions())
             ->map(fn (array $definition, string $key) => ['key' => $key] + $definition)
@@ -84,7 +85,7 @@ class AdminManagementController extends Controller
 
     public function updateSettings(Request $request)
     {
-        $this->ensureAdmin();
+        $this->ensurePermission(Permission::SETTINGS_UPDATE);
 
         $definitions = $this->settingDefinitions();
 
@@ -119,7 +120,7 @@ class AdminManagementController extends Controller
 
     public function users(Request $request)
     {
-        $this->ensureAdmin();
+        $this->ensurePermission(Permission::USERS_VIEW);
 
         $query = User::with(['roles', 'department'])->latest();
 
@@ -141,7 +142,8 @@ class AdminManagementController extends Controller
 
     public function storeUser(Request $request)
     {
-        $this->ensureAdmin();
+        $this->ensurePermission(Permission::USERS_CREATE);
+        $this->ensureCanAssignRole($request);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -167,7 +169,10 @@ class AdminManagementController extends Controller
 
     public function updateUser(Request $request, User $user)
     {
-        $this->ensureAdmin();
+        $this->ensurePermission(Permission::USERS_UPDATE);
+        $this->ensureCanAssignRole($request);
+
+        abort_if(! $request->user()->isAdmin() && $user->isAdmin(), 403, 'Hanya admin yang bisa mengubah akun admin.');
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -179,7 +184,7 @@ class AdminManagementController extends Controller
 
         $adminRoleId = Role::where('name', RoleEnum::ADMIN->value)->value('id');
 
-        if ($user->is(auth()->user()) && (int) $validated['role_id'] !== (int) $adminRoleId) {
+        if ($request->user()->isAdmin() && $user->is(auth()->user()) && (int) $validated['role_id'] !== (int) $adminRoleId) {
             return back()->withErrors(['role_id' => 'Anda tidak bisa menurunkan peran akun sendiri.']);
         }
 
@@ -199,7 +204,7 @@ class AdminManagementController extends Controller
 
     public function penalties()
     {
-        $this->ensureAdmin();
+        $this->ensurePermission(Permission::PENALTIES_VIEW);
 
         $strikes = Strike::with(['user', 'cancelledBy'])
             ->latest()
@@ -218,7 +223,7 @@ class AdminManagementController extends Controller
 
     public function storeStrike(Request $request, PenaltyService $penaltyService)
     {
-        $this->ensureAdmin();
+        $this->ensurePermission(Permission::PENALTIES_CREATE);
 
         $validated = $request->validate([
             'user_id' => ['required', 'exists:users,id'],
@@ -232,7 +237,7 @@ class AdminManagementController extends Controller
 
     public function cancelStrike(Request $request, Strike $strike, PenaltyService $penaltyService)
     {
-        $this->ensureAdmin();
+        $this->ensurePermission(Permission::PENALTIES_UPDATE);
 
         $validated = $request->validate([
             'reason' => ['required', 'string', 'max:255'],
@@ -245,7 +250,7 @@ class AdminManagementController extends Controller
 
     public function storeSuspension(Request $request)
     {
-        $this->ensureAdmin();
+        $this->ensurePermission(Permission::PENALTIES_CREATE);
 
         $validated = $request->validate([
             'user_id' => ['required', 'exists:users,id'],
@@ -261,7 +266,7 @@ class AdminManagementController extends Controller
 
     public function endSuspension(Suspension $suspension)
     {
-        $this->ensureAdmin();
+        $this->ensurePermission(Permission::PENALTIES_UPDATE);
 
         $suspension->update(['ends_at' => now()]);
 
@@ -270,7 +275,7 @@ class AdminManagementController extends Controller
 
     public function bookings()
     {
-        $this->ensureCanManageLoans();
+        $this->ensurePermission(Permission::BOOKINGS_VIEW);
 
         $now = now();
         $todayStart = $now->copy()->startOfDay();
@@ -342,7 +347,7 @@ class AdminManagementController extends Controller
 
     public function loans(Request $request)
     {
-        $this->ensureCanManageLoans();
+        $this->ensurePermission(Permission::LOANS_VIEW);
 
         $query = AssetLoan::with(['asset.resource', 'booking', 'user'])->latest();
 
@@ -357,7 +362,7 @@ class AdminManagementController extends Controller
 
     public function handoverLoan(Request $request, AssetLoan $loan)
     {
-        $this->ensureCanManageLoans();
+        $this->ensurePermission(Permission::LOANS_UPDATE);
 
         if ($loan->status !== LoanStatus::RESERVED) {
             return back()->withErrors(['loan' => 'Aset tidak berada pada status siap diserahkan.']);
@@ -384,7 +389,7 @@ class AdminManagementController extends Controller
 
     public function returnLoan(Request $request, AssetLoan $loan)
     {
-        $this->ensureCanManageLoans();
+        $this->ensurePermission(Permission::LOANS_UPDATE);
 
         if (! in_array($loan->status, [LoanStatus::HANDED_OVER, LoanStatus::IN_USE], true)) {
             return back()->withErrors(['loan' => 'Aset tidak sedang dipinjam.']);
@@ -426,7 +431,7 @@ class AdminManagementController extends Controller
 
     public function reports(Request $request)
     {
-        $this->ensureAdmin();
+        $this->ensurePermission(Permission::REPORTS_VIEW);
 
         $request->validate([
             'from' => ['nullable', 'date'],
@@ -494,6 +499,17 @@ class AdminManagementController extends Controller
             'popularAssets',
             'verification',
         ));
+    }
+
+    private function ensureCanAssignRole(Request $request): void
+    {
+        if ($request->user()->isAdmin()) {
+            return;
+        }
+
+        $adminRoleId = Role::where('name', RoleEnum::ADMIN->value)->value('id');
+
+        abort_if((int) $request->input('role_id') === (int) $adminRoleId, 403, 'Hanya admin yang bisa memberikan peran admin.');
     }
 
     private function locationPayload(Request $request): array
@@ -572,19 +588,5 @@ class AdminManagementController extends Controller
             RoleEnum::RESOURCE_MANAGER->value => 'Pengelola ruangan dan aset',
             RoleEnum::MEMBER->value => 'Anggota',
         ];
-    }
-
-    private function ensureAdmin(): void
-    {
-        abort_unless(auth()->user()->isAdmin(), 403, 'Hanya admin yang bisa mengakses halaman ini.');
-    }
-
-    private function ensureCanManageLoans(): void
-    {
-        abort_unless(
-            auth()->user()->isAdmin() || auth()->user()->hasRole(RoleEnum::RESOURCE_MANAGER->value),
-            403,
-            'Hanya admin atau pengelola ruangan dan aset yang bisa mengelola peminjaman.',
-        );
     }
 }

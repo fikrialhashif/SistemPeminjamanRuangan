@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Web;
 
+use App\Enums\Permission;
 use App\Enums\ResourceType;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
@@ -17,7 +18,7 @@ class MasterDataController extends Controller
 {
     public function categories(): View
     {
-        $this->ensureAdmin();
+        $this->ensurePermission(Permission::CATEGORIES_VIEW);
 
         $categories = Category::withCount('resources')
             ->orderBy('type')
@@ -29,7 +30,7 @@ class MasterDataController extends Controller
 
     public function storeCategory(Request $request): RedirectResponse
     {
-        $this->ensureAdmin();
+        $this->ensurePermission(Permission::CATEGORIES_CREATE);
 
         $validated = $request->validate([
             'name' => [
@@ -48,7 +49,7 @@ class MasterDataController extends Controller
 
     public function updateCategory(Request $request, Category $category): RedirectResponse
     {
-        $this->ensureAdmin();
+        $this->ensurePermission(Permission::CATEGORIES_UPDATE);
 
         $validated = $request->validate([
             'name' => [
@@ -69,7 +70,7 @@ class MasterDataController extends Controller
 
     public function destroyCategory(Category $category): RedirectResponse
     {
-        $this->ensureAdmin();
+        $this->ensurePermission(Permission::CATEGORIES_DELETE);
 
         if ($category->resources()->exists()) {
             return back()->withErrors(['category' => 'Kategori masih dipakai resource. Pindahkan resource terlebih dahulu.']);
@@ -82,7 +83,7 @@ class MasterDataController extends Controller
 
     public function facilities(): View
     {
-        $this->ensureAdmin();
+        $this->ensurePermission(Permission::FACILITIES_VIEW);
 
         $facilities = Facility::orderBy('name')->get();
 
@@ -91,7 +92,7 @@ class MasterDataController extends Controller
 
     public function storeFacility(Request $request): RedirectResponse
     {
-        $this->ensureAdmin();
+        $this->ensurePermission(Permission::FACILITIES_CREATE);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255', 'unique:facilities,name'],
@@ -104,7 +105,7 @@ class MasterDataController extends Controller
 
     public function updateFacility(Request $request, Facility $facility): RedirectResponse
     {
-        $this->ensureAdmin();
+        $this->ensurePermission(Permission::FACILITIES_UPDATE);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255', Rule::unique('facilities', 'name')->ignore($facility->id)],
@@ -117,7 +118,7 @@ class MasterDataController extends Controller
 
     public function destroyFacility(Facility $facility): RedirectResponse
     {
-        $this->ensureAdmin();
+        $this->ensurePermission(Permission::FACILITIES_DELETE);
 
         if (Room::whereJsonContains('facilities', $facility->name)->exists()) {
             return back()->withErrors(['facility' => 'Fasilitas masih dipakai ruangan. Lepaskan dari ruangan terlebih dahulu.']);
@@ -126,10 +127,5 @@ class MasterDataController extends Controller
         $facility->delete();
 
         return back()->with('success', 'Fasilitas dihapus.');
-    }
-
-    private function ensureAdmin(): void
-    {
-        abort_unless(auth()->user()->isAdmin(), 403, 'Hanya admin yang bisa mengakses halaman ini.');
     }
 }

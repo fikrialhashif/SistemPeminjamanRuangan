@@ -13,7 +13,9 @@
                 <span class="plate-stat-value">{{ number_format($categories->count(), 0, ',', '.') }}</span>
                 <span class="plate-stat-label">kategori</span>
             </div>
-            <button type="button" class="btn btn--onplate" data-open-dialog="createCategory">Tambah kategori</button>
+            @if(auth()->user()->hasPermission('categories.create'))
+                <button type="button" class="btn btn--onplate" data-open-dialog="createCategory">Tambah kategori</button>
+            @endif
         </div>
     </header>
 
@@ -22,7 +24,9 @@
             <div class="empty">
                 <p class="empty-title">Belum ada kategori.</p>
                 <p>Tambahkan kategori ruangan atau aset sebelum mendaftarkan data.</p>
-                <button type="button" class="btn btn--primary" data-open-dialog="createCategory">Tambah kategori pertama</button>
+                @if(auth()->user()->hasPermission('categories.create'))
+                    <button type="button" class="btn btn--primary" data-open-dialog="createCategory">Tambah kategori pertama</button>
+                @endif
             </div>
         @else
             <div class="table-wrap">
@@ -51,12 +55,16 @@
                                 <td data-label="Jumlah">{{ $category->resources_count }}</td>
                                 <td data-label="Aksi" class="data-actions">
                                     <div class="cell-actions">
-                                        <button type="button" class="btn btn--ghost btn--sm" data-open-dialog="editCategory{{ $category->id }}">Ubah</button>
-                                        <form method="POST" action="{{ route('admin.categories.destroy', $category) }}" data-confirm="Hapus kategori {{ $category->name }}?">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="btn btn--reject btn--sm">Hapus</button>
-                                        </form>
+                                        @if(auth()->user()->hasPermission('categories.update'))
+                                            <button type="button" class="btn btn--ghost btn--sm" data-open-dialog="editCategory{{ $category->id }}">Ubah</button>
+                                        @endif
+                                        @if(auth()->user()->hasPermission('categories.delete'))
+                                            <form method="POST" action="{{ route('admin.categories.destroy', $category) }}" data-confirm="Hapus kategori {{ $category->name }}?">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn--reject btn--sm">Hapus</button>
+                                            </form>
+                                        @endif
                                     </div>
                                 </td>
                             </tr>

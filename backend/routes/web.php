@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\QrDisplayController;
+use App\Http\Controllers\Web\AccessManagementController;
 use App\Http\Controllers\Web\AdminController;
 use App\Http\Controllers\Web\AdminManagementController;
 use App\Http\Controllers\Web\MasterDataController;
@@ -51,6 +52,9 @@ Route::prefix('admin')->group(function () {
         Route::get('users', [AdminManagementController::class, 'users'])->name('admin.users');
         Route::post('users', [AdminManagementController::class, 'storeUser'])->name('admin.users.store');
         Route::put('users/{user}', [AdminManagementController::class, 'updateUser'])->name('admin.users.update');
+
+        Route::get('access', [AccessManagementController::class, 'index'])->name('admin.access');
+        Route::put('access/{role}', [AccessManagementController::class, 'update'])->name('admin.access.update');
 
         Route::get('penalties', [AdminManagementController::class, 'penalties'])->name('admin.penalties');
         Route::post('strikes', [AdminManagementController::class, 'storeStrike'])->name('admin.strikes.store');

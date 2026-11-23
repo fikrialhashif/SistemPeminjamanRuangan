@@ -13,7 +13,9 @@
                 <span class="plate-stat-value">{{ number_format($resources->total(), 0, ',', '.') }}</span>
                 <span class="plate-stat-label">terdaftar</span>
             </div>
-            <button type="button" class="btn btn--onplate" data-open-dialog="createResource">Tambah ruangan atau aset</button>
+            @if(auth()->user()->hasPermission('resources.create'))
+                <button type="button" class="btn btn--onplate" data-open-dialog="createResource">Tambah ruangan atau aset</button>
+            @endif
         </div>
     </header>
 
@@ -22,7 +24,9 @@
             <div class="empty">
                 <p class="empty-title">Belum ada ruangan atau aset.</p>
                 <p>Tambahkan data pertama supaya bisa dipinjam lewat aplikasi.</p>
-                <button type="button" class="btn btn--primary" data-open-dialog="createResource">Tambah yang pertama</button>
+                @if(auth()->user()->hasPermission('resources.create'))
+                    <button type="button" class="btn btn--primary" data-open-dialog="createResource">Tambah yang pertama</button>
+                @endif
             </div>
         @else
             <div class="table-wrap">
@@ -81,14 +85,18 @@
                                 </td>
                                 <td data-label="Aksi" class="data-actions">
                                     <div class="cell-actions">
-                                        <a class="btn btn--ghost btn--sm" href="{{ route('admin.resources.edit', $resource) }}">Ubah</a>
+                                        @if(auth()->user()->hasPermission('resources.update'))
+                                            <a class="btn btn--ghost btn--sm" href="{{ route('admin.resources.edit', $resource) }}">Ubah</a>
+                                        @endif
                                         <a class="btn btn--ghost btn--sm" href="{{ route('resources.qr', $resource) }}" target="_blank" rel="noopener">Kode QR</a>
-                                        <form method="POST" action="{{ route('admin.resources.toggle', $resource) }}">
-                                            @csrf
-                                            @method('PATCH')
-                                            <button type="submit" class="btn btn--ghost btn--sm">{{ $resource->is_active ? 'Nonaktifkan' : 'Aktifkan' }}</button>
-                                        </form>
-                                        @if(auth()->user()->isAdmin())
+                                        @if(auth()->user()->hasPermission('resources.update'))
+                                            <form method="POST" action="{{ route('admin.resources.toggle', $resource) }}">
+                                                @csrf
+                                                @method('PATCH')
+                                                <button type="submit" class="btn btn--ghost btn--sm">{{ $resource->is_active ? 'Nonaktifkan' : 'Aktifkan' }}</button>
+                                            </form>
+                                        @endif
+                                        @if(auth()->user()->hasPermission('resources.delete'))
                                             <form method="POST" action="{{ route('admin.resources.destroy', $resource) }}" data-confirm="Hapus {{ $resource->name }}? Data akan dihapus dari daftar.">
                                                 @csrf
                                                 @method('DELETE')

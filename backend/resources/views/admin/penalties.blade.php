@@ -9,8 +9,10 @@
             <p class="plate-desc">Catat pelanggaran, batalkan catatan pelanggaran, dan kelola pembatasan akun pengguna.</p>
         </div>
         <div class="plate-aside">
-            <button type="button" class="btn btn--onplate" data-open-dialog="createStrike">Catat pelanggaran</button>
-            <button type="button" class="btn btn--onplate" data-open-dialog="createSuspension">Batasi akun</button>
+            @if(auth()->user()->hasPermission('penalties.create'))
+                <button type="button" class="btn btn--onplate" data-open-dialog="createStrike">Catat pelanggaran</button>
+                <button type="button" class="btn btn--onplate" data-open-dialog="createSuspension">Batasi akun</button>
+            @endif
         </div>
     </header>
 
@@ -64,14 +66,16 @@
                                         @endif
                                     </td>
                                     <td data-label="Aksi" class="data-actions">
-                                        @if(! $strike->cancelled_at)
+                                        @if(! $strike->cancelled_at && auth()->user()->hasPermission('penalties.update'))
                                             <form method="POST" action="{{ route('admin.strikes.cancel', $strike) }}" class="inline-form">
                                                 @csrf
                                                 <input class="input input--sm" type="text" name="reason" placeholder="Alasan pembatalan" required>
                                                 <button type="submit" class="btn btn--ghost btn--sm">Batalkan</button>
                                             </form>
-                                        @else
+                                        @elseif($strike->cancelled_at)
                                             <span class="cell-muted">Oleh {{ $strike->cancelledBy->name ?? 'sistem' }}</span>
+                                        @else
+                                            <span class="cell-muted">&mdash;</span>
                                         @endif
                                     </td>
                                 </tr>
@@ -125,11 +129,13 @@
                                         @endif
                                     </td>
                                     <td data-label="Aksi" class="data-actions">
-                                        @if($suspension->ends_at->isFuture())
+                                        @if($suspension->ends_at->isFuture() && auth()->user()->hasPermission('penalties.update'))
                                             <form method="POST" action="{{ route('admin.suspensions.end', $suspension) }}" data-confirm="Akhiri pembatasan akun {{ $suspension->user->name ?? '' }} sekarang?">
                                                 @csrf
                                                 <button type="submit" class="btn btn--ghost btn--sm">Akhiri</button>
                                             </form>
+                                        @elseif($suspension->ends_at->isFuture())
+                                            <span class="cell-muted">&mdash;</span>
                                         @else
                                             <span class="cell-muted">&mdash;</span>
                                         @endif

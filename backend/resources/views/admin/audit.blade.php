@@ -24,6 +24,7 @@
             'Strike' => 'Pelanggaran',
             'Suspension' => 'Pembatasan akun',
             'Approval' => 'Persetujuan',
+            'Role' => 'Peran',
         ];
     @endphp
 

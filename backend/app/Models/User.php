@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Permission;
 use App\Traits\Auditable;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -86,6 +87,21 @@ class User extends Authenticatable
     public function isAdmin(): bool
     {
         return $this->hasRole(\App\Enums\Role::ADMIN->value);
+    }
+
+    public function hasPermission(Permission|string $permission): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        $key = $permission instanceof Permission ? $permission->value : $permission;
+
+        return $this->roles->contains(function (Role $role) use ($key): bool {
+            $permissions = $role->permissions ?? Permission::defaultsForRole($role->name);
+
+            return in_array($key, $permissions, true);
+        });
     }
 
     public function isSuspended(): bool
