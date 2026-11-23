@@ -247,6 +247,35 @@ button {
     min-width: 0;
 }
 
+.who--button {
+    width: 100%;
+    padding: 6px;
+    margin: -6px 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 140ms ease;
+}
+
+.who--button:hover,
+.who--button:focus-visible {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.who--button:focus-visible {
+    outline: 2px solid var(--amber);
+    outline-offset: 2px;
+}
+
+.who--button:hover .who-role,
+.who--button:focus-visible .who-role {
+    color: #fff;
+}
+
 .who-initial {
     display: grid;
     place-items: center;

@@ -182,13 +182,13 @@
             </nav>
 
             <div class="rail-foot">
-                <div class="who">
+                <button type="button" class="who who--button" data-open-dialog="accountDialog" aria-haspopup="dialog" aria-controls="accountDialog" aria-label="Buka pengaturan akun">
                     <span class="who-initial" aria-hidden="true">{{ strtoupper(mb_substr(auth()->user()->name, 0, 1)) }}</span>
                     <span class="who-text">
                         <span class="who-name">{{ auth()->user()->name }}</span>
                         <span class="who-role">{{ $roleLabel }}</span>
                     </span>
-                </div>
+                </button>
                 <form method="POST" action="{{ route('admin.logout') }}">
                     @csrf
                     <button type="submit" class="logout">Keluar</button>
@@ -213,6 +213,7 @@
             @endif
 
             @yield('content')
+            @include('admin.partials.account-dialog')
         </main>
     </div>
 
@@ -296,6 +297,13 @@
                 form.setAttribute('aria-busy', 'true');
             });
         });
+
+        @if(old('account_popup'))
+            var accountDialog = document.getElementById('accountDialog');
+            if (accountDialog) {
+                accountDialog.showModal();
+            }
+        @endif
     </script>
     @stack('scripts')
 </body>

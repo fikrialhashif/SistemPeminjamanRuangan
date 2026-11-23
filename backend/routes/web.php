@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\QrDisplayController;
 use App\Http\Controllers\Web\AccessManagementController;
+use App\Http\Controllers\Web\AccountController;
 use App\Http\Controllers\Web\AdminController;
 use App\Http\Controllers\Web\AdminManagementController;
 use App\Http\Controllers\Web\MasterDataController;
@@ -21,6 +22,8 @@ Route::prefix('admin')->group(function () {
 
     Route::middleware(['auth'])->group(function () {
         Route::get('dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');
+        Route::put('profile', [AccountController::class, 'updateProfile'])->name('admin.profile.update');
+        Route::put('password', [AccountController::class, 'updatePassword'])->name('admin.password.update');
         Route::get('approvals', [AdminController::class, 'approvals'])->name('admin.approvals');
         Route::post('approvals/{approval}/approve', [AdminController::class, 'approve'])->name('admin.approvals.approve');
         Route::post('approvals/{approval}/reject', [AdminController::class, 'reject'])->name('admin.approvals.reject');
