@@ -3,6 +3,17 @@
 @section('title', 'Pengaturan')
 
 @section('content')
+    @php
+        $visibleDefinitions = collect($definitions)
+            ->reject(fn (array $definition): bool => $definition['key'] === 'waitlist_offer_minutes')
+            ->map(fn (array $definition): array => [
+                ...$definition,
+                'group' => $definition['group'] === 'Persetujuan & antrean'
+                    ? 'Persetujuan'
+                    : $definition['group'],
+            ]);
+    @endphp
+
     <header class="plate">
         <div>
             <h1 class="plate-title">Pengaturan sistem</h1>
@@ -15,7 +26,7 @@
         @method('PUT')
 
         <div class="stack">
-            @foreach(collect($definitions)->groupBy('group') as $group => $items)
+            @foreach($visibleDefinitions->groupBy('group') as $group => $items)
                 <section class="panel">
                     <div class="panel-head">
                         <h2 class="panel-title">{{ $group }}</h2>

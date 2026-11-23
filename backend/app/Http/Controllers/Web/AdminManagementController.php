@@ -557,7 +557,6 @@ class AdminManagementController extends Controller
             'gps_max_speed_mps' => ['group' => 'Lokasi & kode QR', 'label' => 'Kecepatan perpindahan maksimum (m/s)', 'type' => 'integer', 'default' => 100, 'hint' => 'Untuk mendeteksi lompatan lokasi.'],
             'qr_token_ttl_seconds' => ['group' => 'Lokasi & kode QR', 'label' => 'Masa berlaku kode QR (detik)', 'type' => 'integer', 'default' => 30, 'hint' => 'Kode QR berganti otomatis.'],
             'approval_expiry_hours' => ['group' => 'Persetujuan & antrean', 'label' => 'Batas waktu persetujuan (jam)', 'type' => 'integer', 'default' => 48, 'hint' => 'Persetujuan yang lewat batas akan kedaluwarsa.'],
-            'approval_escalate_on_expiry' => ['group' => 'Persetujuan & antrean', 'label' => 'Naikkan ulang saat kedaluwarsa', 'type' => 'boolean', 'default' => false, 'hint' => 'Alihkan persetujuan ke periode berikutnya.'],
             'waitlist_offer_minutes' => ['group' => 'Persetujuan & antrean', 'label' => 'Batas tawaran antrean (menit)', 'type' => 'integer', 'default' => 30, 'hint' => 'Waktu pengguna menerima slot kosong.'],
             'strike_window_days' => ['group' => 'Pelanggaran', 'label' => 'Rentang hitung pelanggaran (hari)', 'type' => 'integer', 'default' => 30, 'hint' => 'Pelanggaran di luar rentang tidak dihitung.'],
             'strike_threshold' => ['group' => 'Pelanggaran', 'label' => 'Batas pelanggaran sebelum pembatasan akun', 'type' => 'integer', 'default' => 3, 'hint' => 'Jumlah pelanggaran pemicu pembatasan akun otomatis.'],
