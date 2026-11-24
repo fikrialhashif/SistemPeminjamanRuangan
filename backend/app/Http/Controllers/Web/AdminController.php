@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers\Web;
 
+use App\Enums\BookingStatus;
 use App\Enums\Permission;
 use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Models\Approval;
+use App\Models\Asset;
+use App\Models\AssetLoan;
 use App\Models\AuditLog;
 use App\Models\Booking;
 use App\Models\Category;
@@ -13,8 +16,12 @@ use App\Models\Facility;
 use App\Models\Location;
 use App\Models\Resource;
 use App\Models\Strike;
+use App\Models\User;
 use App\Services\ApprovalService;
+use Carbon\Carbon;
+use Carbon\CarbonPeriod;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -22,6 +29,22 @@ use Illuminate\Validation\ValidationException;
 
 class AdminController extends Controller
 {
+    private const DASHBOARD_PERIODS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+    /**
+     * @var array<string, int>
+     */
+    private const DASHBOARD_CHART_DEFAULTS = [
+        'booking_trend' => 6,
+        'booking_status' => 6,
+        'top_rooms' => 6,
+        'approval_trend' => 6,
+        'approval_decisions' => 6,
+        'approval_queue' => 6,
+        'room_usage' => 6,
+        'popular_assets' => 6,
+    ];
+
     public function showLoginForm()
     {
         return view('admin.login');
@@ -63,8 +86,10 @@ class AdminController extends Controller
         return redirect()->route('admin.login');
     }
 
-    public function dashboard()
+    public function dashboard(Request $request)
     {
+        $periods = $this->dashboardPeriods($request);
+
         return view('admin.dashboard', [
             'totalBookings' => Booking::count(),
             'pendingApprovals' => Approval::where('status', 'pending')->count(),
@@ -75,7 +100,339 @@ class AdminController extends Controller
                 ->latest()
                 ->limit(4)
                 ->get(),
+            'charts' => $this->dashboardCharts($request->user(), $periods),
+            'periods' => $periods,
+            'periodOptions' => self::DASHBOARD_PERIODS,
         ]);
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function dashboardPeriods(Request $request): array
+    {
+        $input = $request->input('periods', []);
+        $input = is_array($input) ? $input : [];
+
+        $periods = [];
+
+        foreach (self::DASHBOARD_CHART_DEFAULTS as $key => $default) {
+            $months = (int) ($input[$key] ?? $default);
+            $periods[$key] = in_array($months, self::DASHBOARD_PERIODS, true) ? $months : $default;
+        }
+
+        return $periods;
+    }
+
+    /**
+     * @param  array<string, int>  $periods
+     * @return list<array<string, mixed>>
+     */
+    private function dashboardCharts(User $user, array $periods): array
+    {
+        if ($user->isAdmin()) {
+            return [
+                $this->monthlyBookingTrend($periods['booking_trend']),
+                $this->bookingStatusChart($periods['booking_status']),
+                $this->topRoomsChart($periods['top_rooms']),
+            ];
+        }
+
+        $charts = [];
+
+        if ($user->hasPermission(Permission::APPROVALS_VIEW)) {
+            $charts[] = $this->monthlyApprovalTrend($periods['approval_trend']);
+            $charts[] = $this->approvalDecisionChart($periods['approval_decisions']);
+            $charts[] = $this->pendingApprovalsByRoomChart($periods['approval_queue']);
+        }
+
+        if ($user->hasPermission(Permission::BOOKINGS_VIEW) || $user->hasPermission(Permission::RESOURCES_VIEW)) {
+            $charts[] = $this->roomUtilizationChart($periods['room_usage']);
+
+            if ($user->hasPermission(Permission::LOANS_VIEW)) {
+                $charts[] = $this->popularAssetsChart($periods['popular_assets']);
+            }
+
+            $charts[] = $this->assetConditionChart();
+        }
+
+        return $charts;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function monthlyBookingTrend(int $months): array
+    {
+        $counts = Booking::where('starts_at', '>=', $this->dashboardMonthStart($months))
+            ->select('starts_at')
+            ->get()
+            ->countBy(fn (Booking $booking) => $booking->starts_at->format('Y-m'));
+
+        $items = $this->dashboardMonths($months)->map(fn (Carbon $month) => [
+            'label' => $month->locale('id')->isoFormat('MMM'),
+            'value' => (int) ($counts[$month->format('Y-m')] ?? 0),
+        ]);
+
+        return ['key' => 'booking_trend', ...$this->barChart('Tren peminjaman', "{$months} bulan terakhir", $items)];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function monthlyApprovalTrend(int $months): array
+    {
+        $counts = Approval::where('created_at', '>=', $this->dashboardMonthStart($months))
+            ->select('created_at')
+            ->get()
+            ->countBy(fn (Approval $approval) => $approval->created_at->format('Y-m'));
+
+        $items = $this->dashboardMonths($months)->map(fn (Carbon $month) => [
+            'label' => $month->locale('id')->isoFormat('MMM'),
+            'value' => (int) ($counts[$month->format('Y-m')] ?? 0),
+        ]);
+
+        return ['key' => 'approval_trend', ...$this->barChart('Pengajuan persetujuan', "{$months} bulan terakhir", $items)];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function bookingStatusChart(int $months): array
+    {
+        $labels = [
+            BookingStatus::PENDING->value => 'Menunggu',
+            BookingStatus::APPROVED->value => 'Disetujui',
+            BookingStatus::CHECKED_IN->value => 'Check-in',
+            BookingStatus::COMPLETED->value => 'Selesai',
+            BookingStatus::REJECTED->value => 'Ditolak',
+            BookingStatus::CANCELLED->value => 'Dibatalkan',
+            BookingStatus::EXPIRED->value => 'Kedaluwarsa',
+            BookingStatus::NO_SHOW->value => 'Tidak hadir',
+            BookingStatus::WAITLISTED->value => 'Antrian',
+        ];
+        $counts = Booking::whereBetween('starts_at', [$this->dashboardPeriodStart($months), now()])
+            ->select('status')
+            ->get()
+            ->countBy(fn (Booking $booking) => $booking->status->value);
+
+        $items = collect(BookingStatus::cases())
+            ->map(fn (BookingStatus $status) => [
+                'label' => $labels[$status->value],
+                'value' => (int) ($counts[$status->value] ?? 0),
+            ])
+            ->filter(fn (array $item) => $item['value'] > 0)
+            ->values();
+
+        return ['key' => 'booking_status', ...$this->donutChart('Distribusi status peminjaman', "{$months} bulan terakhir", $items)];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function approvalDecisionChart(int $months): array
+    {
+        $labels = ['pending' => 'Menunggu', 'approved' => 'Disetujui', 'rejected' => 'Ditolak'];
+        $counts = Approval::whereBetween('created_at', [$this->dashboardPeriodStart($months), now()])
+            ->select('status')
+            ->get()
+            ->countBy(fn (Approval $approval) => $approval->status);
+
+        $items = collect($labels)
+            ->map(fn (string $label, string $status) => [
+                'label' => $label,
+                'value' => (int) ($counts[$status] ?? 0),
+            ])
+            ->filter(fn (array $item) => $item['value'] > 0)
+            ->values();
+
+        return ['key' => 'approval_decisions', ...$this->donutChart('Hasil keputusan persetujuan', "{$months} bulan terakhir", $items)];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function pendingApprovalsByRoomChart(int $months): array
+    {
+        $approvals = Approval::actionable()
+            ->where('approvals.created_at', '>=', $this->dashboardPeriodStart($months))
+            ->with('booking.resource')
+            ->get();
+        $counts = $approvals->countBy(fn (Approval $approval) => (int) ($approval->booking->resource_id ?? 0));
+        $names = $approvals->mapWithKeys(fn (Approval $approval) => [
+            (int) ($approval->booking->resource_id ?? 0) => $approval->booking->resource->name ?? 'Ruangan atau aset',
+        ]);
+
+        $items = $counts->map(fn (int $count, int $resourceId) => [
+            'label' => $names[$resourceId] ?? 'Ruangan atau aset',
+            'value' => $count,
+        ])
+            ->sortByDesc('value')
+            ->take(5)
+            ->values();
+
+        return ['key' => 'approval_queue', ...$this->barChart('Antrian persetujuan per ruangan', "{$months} bulan terakhir · menunggu keputusan", $items)];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function topRoomsChart(int $months): array
+    {
+        $items = Booking::with('resource')
+            ->where('status', BookingStatus::COMPLETED->value)
+            ->whereBetween('starts_at', [now()->subDays(30), now()])
+            ->whereHas('resource', fn ($query) => $query->where('type', 'room'))
+            ->get()
+            ->groupBy('resource_id')
+            ->map(fn (Collection $bookings) => [
+                'label' => $bookings->first()->resource?->name ?? 'Ruangan',
+                'value' => $bookings->count(),
+            ])
+            ->sortByDesc('value')
+            ->take(5)
+            ->values();
+
+        return ['key' => 'top_rooms', ...$this->barChart('Ruangan paling sering dipakai', "{$months} bulan terakhir · peminjaman selesai", $items)];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function roomUtilizationChart(int $months): array
+    {
+        $items = Booking::with('resource')
+            ->where('status', BookingStatus::COMPLETED->value)
+            ->whereBetween('starts_at', [now()->subDays(30), now()])
+            ->whereHas('resource', fn ($query) => $query->where('type', 'room'))
+            ->get()
+            ->groupBy('resource_id')
+            ->map(fn (Collection $bookings) => [
+                'label' => $bookings->first()->resource?->name ?? 'Ruangan',
+                'value' => (int) $bookings->sum(fn (Booking $booking) => $booking->starts_at->diffInMinutes($booking->ends_at)),
+            ])
+            ->sortByDesc('value')
+            ->take(5)
+            ->values();
+
+        return ['key' => 'room_usage', ...$this->barChart('Pemakaian ruangan', "{$months} bulan terakhir · total menit", $items)];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function popularAssetsChart(int $months): array
+    {
+        $items = AssetLoan::with('asset.resource')
+            ->whereBetween('created_at', [now()->subDays(30), now()])
+            ->get()
+            ->groupBy('asset_id')
+            ->map(fn (Collection $loans) => [
+                'label' => $loans->first()->asset?->resource?->name ?? 'Aset',
+                'value' => $loans->count(),
+            ])
+            ->sortByDesc('value')
+            ->take(5)
+            ->values();
+
+        return ['key' => 'popular_assets', ...$this->barChart('Aset paling sering dipinjam', "{$months} bulan terakhir", $items)];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function assetConditionChart(): array
+    {
+        $labels = [
+            'good' => 'Baik',
+            'damaged' => 'Rusak',
+            'lost' => 'Hilang',
+            'maintenance' => 'Perawatan',
+        ];
+        $counts = Asset::select('condition')->get()->countBy('condition');
+
+        $items = collect($labels)
+            ->map(fn (string $label, string $condition) => [
+                'label' => $label,
+                'value' => (int) ($counts[$condition] ?? 0),
+            ])
+            ->filter(fn (array $item) => $item['value'] > 0)
+            ->values();
+
+        return $this->donutChart('Kondisi aset', 'Saat ini', $items);
+    }
+
+    private function dashboardMonthStart(int $months): Carbon
+    {
+        return now()->subMonths($months - 1)->startOfMonth();
+    }
+
+    private function dashboardPeriodStart(int $months): Carbon
+    {
+        return now()->subMonths($months);
+    }
+
+    /**
+     * @return Collection<int, Carbon>
+     */
+    private function dashboardMonths(int $months): Collection
+    {
+        return collect(CarbonPeriod::create($this->dashboardMonthStart($months), '1 month', now()->startOfMonth()));
+    }
+
+    /**
+     * @param  Collection<int, array{label: string, value: int}>  $items
+     * @return array<string, mixed>
+     */
+    private function barChart(string $title, string $note, Collection $items): array
+    {
+        $maximum = (int) $items->max('value');
+
+        return [
+            'title' => $title,
+            'note' => $note,
+            'kind' => 'bars',
+            'items' => $items
+                ->map(fn (array $item) => [
+                    ...$item,
+                    'percent' => $maximum > 0 ? (int) round($item['value'] / $maximum * 100) : 0,
+                ])
+                ->all(),
+        ];
+    }
+
+    /**
+     * @param  Collection<int, array{label: string, value: int}>  $items
+     * @return array<string, mixed>
+     */
+    private function donutChart(string $title, string $note, Collection $items): array
+    {
+        $total = (int) $items->sum('value');
+        $palette = ['var(--forest)', 'var(--amber)', 'var(--danger)', 'var(--muted-2)', '#7ba894', '#b9cbbf'];
+        $offset = 0;
+        $segments = [];
+
+        $legend = $items->map(function (array $item, int $index) use ($total, $palette, &$offset, &$segments): array {
+            $percent = $total > 0 ? round($item['value'] / $total * 100, 2) : 0;
+            $color = $palette[$index % count($palette)];
+            $segments[] = "{$color} {$offset}% ".($offset + $percent).'%';
+            $offset += $percent;
+
+            return [...$item, 'percent' => (int) round($percent), 'color' => $color];
+        })->all();
+
+        if ($total > 0 && $offset < 100) {
+            $segments[] = "var(--line) {$offset}% 100%";
+        }
+
+        return [
+            'title' => $title,
+            'note' => $note,
+            'kind' => 'donut',
+            'total' => $total,
+            'gradient' => $total > 0 ? 'conic-gradient('.implode(', ', $segments).')' : 'conic-gradient(var(--line) 0 100%)',
+            'items' => $legend,
+        ];
     }
 
     public function approvals(Request $request)

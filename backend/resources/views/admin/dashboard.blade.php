@@ -43,6 +43,75 @@
         </div>
     </section>
 
+    @if($charts)
+        <section class="charts" aria-label="Grafik ringkasan">
+            @foreach($charts as $chart)
+                <article class="panel chart-card">
+                    <div class="panel-head">
+                        <h2 class="panel-title">{{ $chart['title'] }}</h2>
+                        @if(! empty($chart['key']))
+                            <form method="GET" action="{{ route('admin.dashboard') }}" class="chart-filter">
+                                @foreach($periods as $key => $value)
+                                    @if($key !== $chart['key'])
+                                        <input type="hidden" name="periods[{{ $key }}]" value="{{ $value }}">
+                                    @endif
+                                @endforeach
+                                <label class="chart-filter-label" for="period_{{ $chart['key'] }}">Periode</label>
+                                <select class="input input--sm" id="period_{{ $chart['key'] }}" name="periods[{{ $chart['key'] }}]" data-chart-period>
+                                    @foreach($periodOptions as $option)
+                                        <option value="{{ $option }}" @selected($option === $periods[$chart['key']])>{{ $option }} bulan</option>
+                                    @endforeach
+                                </select>
+                                <button type="submit" class="btn btn--ghost btn--sm">Terapkan</button>
+                            </form>
+                        @else
+                            <span class="tag">{{ $chart['note'] }}</span>
+                        @endif
+                    </div>
+
+                    @if(! empty($chart['key']))
+                        <p class="chart-note">{{ $chart['note'] }}</p>
+                    @endif
+
+                    @if(empty($chart['items']))
+                        <div class="empty">
+                            <p class="empty-title">Belum ada data.</p>
+                            <p>Grafik ini akan terisi setelah ada aktivitas yang relevan.</p>
+                        </div>
+                    @elseif($chart['kind'] === 'donut')
+                        <div class="chart-donut-body" role="img" aria-label="{{ $chart['title'] }}, total {{ $chart['total'] }}">
+                            <div class="chart-donut" style="background: {{ $chart['gradient'] }}" aria-hidden="true">
+                                <span class="chart-donut-hole">
+                                    <span class="chart-donut-total">{{ number_format($chart['total'], 0, ',', '.') }}</span>
+                                    <span class="chart-donut-caption">total</span>
+                                </span>
+                            </div>
+                            <ul class="chart-legend">
+                                @foreach($chart['items'] as $item)
+                                    <li class="chart-legend-row">
+                                        <span class="chart-swatch" style="background: {{ $item['color'] }}" aria-hidden="true"></span>
+                                        <span class="chart-legend-label">{{ $item['label'] }}</span>
+                                        <span class="chart-legend-value">{{ number_format($item['value'], 0, ',', '.') }} <small>{{ $item['percent'] }}%</small></span>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @else
+                        <div class="chart-bars" role="img" aria-label="{{ $chart['title'] }}">
+                            @foreach($chart['items'] as $item)
+                                <div class="chart-bar-row">
+                                    <span class="chart-bar-label" title="{{ $item['label'] }}">{{ $item['label'] }}</span>
+                                    <span class="chart-bar-track" aria-hidden="true"><span class="chart-bar-fill" style="width: {{ $item['percent'] }}%"></span></span>
+                                    <span class="chart-bar-value">{{ number_format($item['value'], 0, ',', '.') }}</span>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                </article>
+            @endforeach
+        </section>
+    @endif
+
     <div class="split">
         <section class="panel">
             <div class="panel-head">
@@ -107,4 +176,14 @@
             </div>
         </section>
     </div>
+
+    @push('scripts')
+        <script>
+            document.querySelectorAll('[data-chart-period]').forEach(function (select) {
+                select.addEventListener('change', function () {
+                    this.form.submit();
+                });
+            });
+        </script>
+    @endpush
 @endsection
