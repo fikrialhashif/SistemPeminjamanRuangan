@@ -48,4 +48,93 @@ void main() {
     tracker.update(faceDetected: false, yaw: null);
     expect(tracker.phase, FaceGuidancePhase.turn);
   });
+
+  test('pendaftaran otomatis mengambil depan lalu dua tolehan berlawanan', () {
+    final tracker = FaceEnrollmentGuidanceTracker();
+
+    for (
+      var i = 0;
+      i < FaceEnrollmentGuidanceTracker.frontStableFrames - 1;
+      i++
+    ) {
+      expect(
+        tracker.update(faceDetected: true, yaw: 2),
+        FaceEnrollmentAction.none,
+      );
+    }
+    expect(
+      tracker.update(faceDetected: true, yaw: 2),
+      FaceEnrollmentAction.captureFront,
+    );
+    tracker.markFrontCaptured();
+    expect(tracker.capturedCount, 1);
+
+    for (
+      var i = 0;
+      i < FaceEnrollmentGuidanceTracker.turnStableFrames - 1;
+      i++
+    ) {
+      expect(
+        tracker.update(faceDetected: true, yaw: -30),
+        FaceEnrollmentAction.none,
+      );
+    }
+    expect(
+      tracker.update(faceDetected: true, yaw: -30),
+      FaceEnrollmentAction.captureTurn,
+    );
+    tracker.markTurnCaptured(-30);
+    expect(tracker.capturedCount, 2);
+    expect(tracker.complete, isFalse);
+
+    for (var i = 0; i < 6; i++) {
+      expect(
+        tracker.update(faceDetected: true, yaw: -32),
+        FaceEnrollmentAction.none,
+      );
+    }
+
+    for (
+      var i = 0;
+      i < FaceEnrollmentGuidanceTracker.turnStableFrames - 1;
+      i++
+    ) {
+      expect(
+        tracker.update(faceDetected: true, yaw: 30),
+        FaceEnrollmentAction.none,
+      );
+    }
+    expect(
+      tracker.update(faceDetected: true, yaw: 30),
+      FaceEnrollmentAction.captureTurn,
+    );
+    tracker.markTurnCaptured(30);
+    expect(tracker.complete, isTrue);
+    expect(tracker.capturedCount, 3);
+  });
+
+  test('pendaftaran menunggu wajah lurus sebelum mengambil sampel', () {
+    final tracker = FaceEnrollmentGuidanceTracker();
+    for (var i = 0; i < 8; i++) {
+      expect(
+        tracker.update(faceDetected: true, yaw: 35),
+        FaceEnrollmentAction.none,
+      );
+    }
+    expect(tracker.capturedCount, 0);
+  });
+
+  test('pendaftaran mengabaikan tolehan yang sama arah dua kali', () {
+    final tracker = FaceEnrollmentGuidanceTracker()
+      ..markFrontCaptured()
+      ..markTurnCaptured(-30);
+    for (var i = 0; i < 8; i++) {
+      expect(
+        tracker.update(faceDetected: true, yaw: -35),
+        FaceEnrollmentAction.none,
+      );
+    }
+    expect(tracker.complete, isFalse);
+    expect(tracker.capturedCount, 2);
+  });
 }

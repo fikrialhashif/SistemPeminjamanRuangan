@@ -9,7 +9,9 @@ use App\Models\Location;
 use App\Models\Resource;
 use App\Models\Role;
 use App\Models\User;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -138,6 +140,32 @@ class MasterDataTest extends TestCase
             ->assertOk()
             ->assertJsonFragment(['category' => 'Ruang rapat'])
             ->assertJsonFragment(['category_id' => $category->id]);
+    }
+
+    public function test_api_keeps_legacy_category_string_when_category_relation_is_missing(): void
+    {
+        Schema::table('resources', function (Blueprint $table) {
+            $table->string('category')->nullable();
+        });
+
+        $admin = $this->userWithRole(RoleEnum::ADMIN);
+        $resource = new Resource([
+            'name' => 'Ruang Rapat 2',
+            'type' => 'room',
+            'location_id' => $this->location()->id,
+        ]);
+        $resource->setAttribute('category', 'meeting_room');
+        $resource->save();
+
+        Sanctum::actingAs($admin);
+
+        $this->getJson('/api/v1/resources')
+            ->assertOk()
+            ->assertJsonFragment(['category' => 'meeting_room']);
+
+        $this->getJson('/api/v1/resources/'.$resource->id)
+            ->assertOk()
+            ->assertJsonPath('category', 'meeting_room');
     }
 
     private function userWithRole(RoleEnum $role): User

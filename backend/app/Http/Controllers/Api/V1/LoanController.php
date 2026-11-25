@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Data\VerificationStepOutcome;
 use App\Enums\LoanStatus;
+use App\Enums\VerificationStage;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\HandoverRequest;
 use App\Http\Requests\LoanOverrideRequest;
@@ -11,7 +13,10 @@ use App\Models\AssetLoan;
 use App\Models\ConditionReport;
 use App\Models\LoanEvent;
 use App\Services\FaceVerificationService;
+use App\Services\GpsValidator;
 use App\Services\QrTokenService;
+use App\Services\VerificationSessionBuilder;
+use App\Services\VerificationTimePolicy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +27,9 @@ class LoanController extends Controller
     public function __construct(
         protected FaceVerificationService $faceVerificationService,
         protected QrTokenService $qrTokenService,
+        protected GpsValidator $gpsValidator,
+        protected VerificationTimePolicy $verificationTimePolicy,
+        protected VerificationSessionBuilder $verificationSessionBuilder,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -48,24 +56,45 @@ class LoanController extends Controller
             return response()->json(['message' => 'Loan is not in reserved state.'], 422);
         }
 
+        $timeOutcome = $assetLoan->booking
+            ? $this->verificationTimePolicy->evaluateForBooking($assetLoan->booking)
+            : new VerificationStepOutcome(VerificationStage::TIME, false, 'Jadwal peminjaman tidak ditemukan.');
+        $locationOutcome = $this->evaluateLocation($assetLoan, $request);
+
         $tokenResult = $this->qrTokenService->validateForAsset(
             (string) $request->input('asset_token'),
             $assetLoan->asset->code,
         );
-
-        if (! $tokenResult['valid']) {
-            return response()->json([
-                'message' => $tokenResult['reason'] === 'Asset mismatch'
-                    ? 'Kode aset tidak sesuai dengan pinjaman ini.'
-                    : 'QR aset tidak valid.',
-                'reason' => $tokenResult['reason'],
-            ], 422);
-        }
+        $qrReason = $tokenResult['valid']
+            ? null
+            : ($tokenResult['reason'] === 'Asset mismatch'
+                ? 'Kode aset tidak sesuai dengan pinjaman ini.'
+                : 'QR aset tidak valid.');
+        $qrOutcome = new VerificationStepOutcome(VerificationStage::QR, $tokenResult['valid'], $qrReason);
 
         $faceResult = $this->faceVerificationService->verify($request->user(), $request->input('face_image'));
+        $faceValid = (bool) ($faceResult['match'] ?? false);
+        $faceOutcome = new VerificationStepOutcome(
+            VerificationStage::FACE,
+            $faceValid,
+            $faceValid ? null : 'Verifikasi wajah gagal.',
+        );
 
-        if (! ($faceResult['match'] ?? false)) {
-            return response()->json(['message' => 'Face verification failed.'], 422);
+        $session = $this->verificationSessionBuilder->forHandover($assetLoan->id, [
+            'location' => $locationOutcome,
+            'qr' => $qrOutcome,
+            'face' => $faceOutcome,
+            'time' => $timeOutcome,
+        ]);
+
+        if (! $session->accepted()) {
+            $failure = $session->firstFailure();
+
+            return response()->json([
+                'message' => $failure?->reason ?? 'Verifikasi serah-terima gagal.',
+                'reason' => $failure?->stage->value,
+                'verification' => $session->toArray(),
+            ], 422);
         }
 
         $assetCode = $assetLoan->asset->code;
@@ -93,7 +122,10 @@ class LoanController extends Controller
             ]);
         });
 
-        return response()->json($assetLoan->fresh(['asset', 'events']));
+        $data = $assetLoan->fresh(['asset', 'events'])->toArray();
+        $data['verification'] = $session->toArray();
+
+        return response()->json($data);
     }
 
     public function returnAsset(ReturnRequest $request, AssetLoan $assetLoan): JsonResponse
@@ -218,5 +250,35 @@ class LoanController extends Controller
         ]);
 
         return response()->json($report, 201);
+    }
+
+    private function evaluateLocation(AssetLoan $assetLoan, Request $request): VerificationStepOutcome
+    {
+        $assetLoan->loadMissing('asset.resource.location');
+        $location = $assetLoan->asset->resource->location;
+
+        if ($location === null) {
+            return new VerificationStepOutcome(
+                VerificationStage::LOCATION,
+                false,
+                'Lokasi serah-terima aset belum tersedia.',
+            );
+        }
+
+        $result = $this->gpsValidator->validate(
+            $location,
+            (float) $request->input('gps_latitude'),
+            (float) $request->input('gps_longitude'),
+            (float) $request->input('gps_accuracy'),
+            (string) ($request->input('gps_timestamp') ?? now()->toIso8601String()),
+            (bool) $request->input('gps_is_mock', false),
+            $request->user()->id,
+        );
+
+        return new VerificationStepOutcome(
+            VerificationStage::LOCATION,
+            $result['valid'],
+            $result['valid'] ? null : implode('; ', $result['reasons']),
+        );
     }
 }

@@ -9,6 +9,8 @@ use App\Models\Booking;
 use App\Models\Location;
 use App\Models\Resource;
 use App\Models\Role;
+use App\Models\Setting;
+use App\Models\Strike;
 use App\Models\User;
 use App\Services\FaceVerificationService;
 use App\Services\QrTokenService;
@@ -100,6 +102,85 @@ class QrStaticLabelTest extends TestCase
         $this->assertTrue($booking->checkInAttempts()->latest()->firstOrFail()->qr_valid);
     }
 
+    public function test_check_in_outside_time_window_returns_four_step_session(): void
+    {
+        $room = $this->room('Ruang Rapat A1');
+        $user = User::factory()->create();
+        $booking = Booking::create([
+            'user_id' => $user->id,
+            'resource_id' => $room->id,
+            'title' => 'Rapat tim',
+            'starts_at' => now()->addHours(2),
+            'ends_at' => now()->addHours(3),
+            'status' => 'approved',
+        ]);
+        $token = app(QrTokenService::class)->generate($room->id)['token'];
+
+        $this->actingAs($user)
+            ->postJson("/api/v1/bookings/{$booking->id}/check-in", [
+                'qr_token' => $token,
+                'gps_latitude' => -6.2,
+                'gps_longitude' => 106.8,
+                'gps_accuracy' => 10,
+                'gps_timestamp' => now()->toIso8601String(),
+                'gps_is_mock' => false,
+            ])
+            ->assertOk()
+            ->assertJsonPath('result', 'rejected')
+            ->assertJsonPath('verification.accepted', false)
+            ->assertJsonPath('verification.steps.0.passed', true)
+            ->assertJsonPath('verification.steps.1.passed', true)
+            ->assertJsonPath('verification.steps.2.passed', false)
+            ->assertJsonPath('verification.steps.3.stage', 'time')
+            ->assertJsonPath('verification.steps.3.passed', false);
+    }
+
+    public function test_time_only_check_in_failures_do_not_accumulate_strikes(): void
+    {
+        $this->mock(FaceVerificationService::class)
+            ->shouldReceive('verify')
+            ->andReturn(['match' => true]);
+        Setting::set('checkin_failure_strike_threshold', 3);
+
+        $room = $this->room('Ruang Rapat A1');
+        $user = User::factory()->create();
+        $booking = Booking::create([
+            'user_id' => $user->id,
+            'resource_id' => $room->id,
+            'title' => 'Rapat tim',
+            'starts_at' => now()->addHours(2),
+            'ends_at' => now()->addHours(3),
+            'status' => 'approved',
+        ]);
+        $token = app(QrTokenService::class)->generate($room->id)['token'];
+        $payload = [
+            'qr_token' => $token,
+            'face_image' => 'face.jpg',
+            'gps_latitude' => -6.2,
+            'gps_longitude' => 106.8,
+            'gps_accuracy' => 10,
+            'gps_timestamp' => now()->toIso8601String(),
+            'gps_is_mock' => false,
+        ];
+
+        for ($attempt = 0; $attempt < 3; $attempt++) {
+            $this->actingAs($user)->postJson("/api/v1/bookings/{$booking->id}/check-in", $payload)
+                ->assertOk()
+                ->assertJsonPath('result', 'rejected');
+        }
+
+        $booking->update([
+            'starts_at' => now()->addMinutes(5),
+            'ends_at' => now()->addMinutes(65),
+        ]);
+        $this->actingAs($user)
+            ->postJson("/api/v1/bookings/{$booking->id}/check-in", ['qr_token' => 'invalid'] + $payload)
+            ->assertOk()
+            ->assertJsonPath('result', 'rejected');
+
+        $this->assertSame(0, Strike::where('user_id', $user->id)->count());
+    }
+
     public function test_handover_requires_manager_and_valid_asset_token(): void
     {
         $this->mock(FaceVerificationService::class)
@@ -145,6 +226,43 @@ class QrStaticLabelTest extends TestCase
         $this->assertSame('handed_over', $loan->fresh()->status->value);
         $this->assertSame('in_use', $asset->fresh()->status);
         $this->assertSame('static_label', $loan->events()->firstOrFail()->data['scan_source']);
+    }
+
+    public function test_handover_rejects_outside_time_window_with_four_step_session(): void
+    {
+        $this->mock(FaceVerificationService::class)
+            ->shouldReceive('verify')
+            ->andReturn(['match' => true]);
+
+        $resource = $this->asset('Kamera DSLR', 'CAM-001');
+        $asset = $resource->asset;
+        $manager = $this->userWithRole(RoleEnum::RESOURCE_MANAGER);
+        $borrower = $this->userWithRole(RoleEnum::MEMBER);
+        $loan = $this->loan($resource, $asset, $borrower);
+        $loan->booking->update([
+            'starts_at' => now()->addHours(2),
+            'ends_at' => now()->addHours(3),
+        ]);
+
+        $payload = [
+            'asset_token' => app(QrTokenService::class)->generateForAsset($asset)['token'],
+            'face_image' => 'face.jpg',
+            'gps_latitude' => -6.2,
+            'gps_longitude' => 106.8,
+            'gps_accuracy' => 10,
+        ];
+
+        $this->actingAs($manager)
+            ->postJson("/api/v1/loans/{$loan->id}/handover", $payload)
+            ->assertStatus(422)
+            ->assertJsonPath('reason', 'time')
+            ->assertJsonPath('verification.steps.0.stage', 'location')
+            ->assertJsonPath('verification.steps.1.stage', 'qr')
+            ->assertJsonPath('verification.steps.2.stage', 'face')
+            ->assertJsonPath('verification.steps.3.stage', 'time')
+            ->assertJsonPath('verification.steps.3.passed', false);
+
+        $this->assertSame('reserved', $loan->fresh()->status->value);
     }
 
     public function test_return_validates_asset_token_and_restores_asset(): void
@@ -226,8 +344,8 @@ class QrStaticLabelTest extends TestCase
             'user_id' => $borrower->id,
             'resource_id' => $resource->id,
             'title' => 'Pinjam kamera',
-            'starts_at' => now()->addHour(),
-            'ends_at' => now()->addHours(2),
+            'starts_at' => now()->addMinutes(5),
+            'ends_at' => now()->addMinutes(65),
             'status' => 'approved',
         ]);
 

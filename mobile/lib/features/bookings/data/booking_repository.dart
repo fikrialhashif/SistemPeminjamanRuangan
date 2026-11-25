@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_error.dart';
 import '../../../core/network/dio_provider.dart';
+import 'availability_schedule.dart';
 
 final bookingRepositoryProvider = Provider<BookingRepository>(
   (ref) => BookingRepository(ref.read(dioProvider)),
@@ -12,7 +13,7 @@ class BookingRepository {
   BookingRepository(this._dio);
   final Dio _dio;
 
-  Future<List<Map<String, dynamic>>> availability(
+  Future<AvailabilitySchedule> availability(
     String resourceId,
     DateTime date,
   ) async {
@@ -21,10 +22,10 @@ class BookingRepository {
         '/resources/$resourceId/availability',
         queryParameters: {'date': _date(date)},
       );
-      final slots = (response.data as Map)['slots'] as List? ?? const [];
-      return slots
-          .map((item) => Map<String, dynamic>.from(item as Map))
-          .toList();
+      return AvailabilitySchedule.fromJson(
+        Map<String, dynamic>.from(response.data as Map),
+        requestedDate: date,
+      );
     } catch (error) {
       throw mapDioError(error);
     }

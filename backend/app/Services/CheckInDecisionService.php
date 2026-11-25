@@ -21,14 +21,19 @@ class CheckInDecisionService
         protected GpsValidator $gpsValidator,
         protected FaceVerificationService $faceVerificationService,
         protected PenaltyService $penaltyService,
+        protected VerificationTimePolicy $verificationTimePolicy,
     ) {}
 
     public function process(Booking $booking, User $user, array $evidence): CheckInAttempt
     {
         $this->validateOwnership($booking, $user);
-        $this->validateTimeWindow($booking);
 
+        $timeOutcome = $this->verificationTimePolicy->evaluateForBooking($booking);
         $rejectionReasons = [];
+
+        if (! $timeOutcome->passed) {
+            $rejectionReasons[] = 'time: '.$timeOutcome->reason;
+        }
 
         $qrResult = $this->qrTokenService->validate(
             $evidence['qr_token'],
@@ -124,7 +129,7 @@ class CheckInDecisionService
             }
         }
 
-        $result = $this->determineResult($qrValid, $gpsValid, $faceValid);
+        $result = $this->determineResult($timeOutcome->passed, $qrValid, $gpsValid, $faceValid);
 
         $attempt = CheckInAttempt::create([
             'booking_id' => $booking->id,
@@ -146,7 +151,7 @@ class CheckInDecisionService
             $booking->update(['status' => BookingStatus::CHECKED_IN]);
         }
 
-        if ($result === CheckInResult::REJECTED) {
+        if ($result === CheckInResult::REJECTED && $timeOutcome->passed) {
             $this->handleRepeatedFailures($booking, $user);
         }
 
@@ -168,23 +173,12 @@ class CheckInDecisionService
         }
     }
 
-    private function validateTimeWindow(Booking $booking): void
+    private function determineResult(bool $timeValid, bool $qrValid, bool $gpsValid, ?bool $faceValid): CheckInResult
     {
-        $beforeMinutes = Setting::get('checkin_window_before_minutes', 15);
-        $afterMinutes = Setting::get('checkin_window_after_minutes', 15);
-
-        $windowStart = $booking->starts_at->copy()->subMinutes($beforeMinutes);
-        $windowEnd = $booking->starts_at->copy()->addMinutes($afterMinutes);
-
-        if (now()->lt($windowStart) || now()->gt($windowEnd)) {
-            throw ValidationException::withMessages([
-                'time' => 'Check-in is only allowed within the designated time window.',
-            ]);
+        if (! $timeValid) {
+            return CheckInResult::REJECTED;
         }
-    }
 
-    private function determineResult(bool $qrValid, bool $gpsValid, ?bool $faceValid): CheckInResult
-    {
         if ($faceValid === null) {
             return CheckInResult::NEEDS_MANUAL_REVIEW;
         }
@@ -203,6 +197,9 @@ class CheckInDecisionService
         $recentFailures = CheckInAttempt::where('booking_id', $booking->id)
             ->where('user_id', $user->id)
             ->where('result', CheckInResult::REJECTED)
+            ->get(['rejection_reasons'])
+            ->filter(fn (CheckInAttempt $attempt) => ! collect($attempt->rejection_reasons ?? [])
+                ->contains(fn ($reason) => str_starts_with(strtolower((string) $reason), 'time:')))
             ->count();
 
         if ($recentFailures >= $threshold) {

@@ -12,6 +12,7 @@ use App\Models\BookingSeries;
 use App\Models\WaitlistEntry;
 use App\Services\BookingService;
 use App\Services\CheckInDecisionService;
+use App\Services\VerificationSessionBuilder;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,6 +23,7 @@ class BookingController extends Controller
     public function __construct(
         protected BookingService $bookingService,
         protected CheckInDecisionService $checkInDecisionService,
+        protected VerificationSessionBuilder $verificationSessionBuilder,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -69,7 +71,10 @@ class BookingController extends Controller
             $request->validated(),
         );
 
-        return response()->json($attempt);
+        return response()->json([
+            ...$attempt->toArray(),
+            'verification' => $this->verificationSessionBuilder->forCheckInAttempt($attempt)->toArray(),
+        ]);
     }
 
     public function bundled(StoreBundledBookingRequest $request): JsonResponse

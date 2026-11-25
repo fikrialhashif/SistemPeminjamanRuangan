@@ -10,6 +10,7 @@ import '../../../core/widgets/user_quick_access_sheet.dart';
 import '../../face/data/face_providers.dart';
 import '../../face/data/face_repository.dart';
 import '../../resources/presentation/resource_providers.dart';
+import '../data/availability_schedule.dart';
 import '../data/booking_repository.dart';
 import 'availability_widgets.dart';
 import 'booking_providers.dart';
@@ -280,13 +281,11 @@ class _BookingFormPageState extends ConsumerState<BookingFormPage> {
     });
   }
 
-  void _selectSlot(Map<String, dynamic> slot) {
-    final slotStart = availabilityStart(slot);
-    final slotEnd = availabilityEnd(slot);
-    if (slotStart == null || slotEnd == null) return;
+  void _selectSlot(AvailabilityInterval interval) {
+    if (!interval.selectable) return;
     setState(() {
-      start = TimeOfDay.fromDateTime(slotStart);
-      end = TimeOfDay.fromDateTime(slotEnd);
+      start = TimeOfDay.fromDateTime(interval.start);
+      end = TimeOfDay.fromDateTime(interval.end);
       error = null;
     });
   }
@@ -439,12 +438,12 @@ class _ScheduleCard extends StatelessWidget {
   });
 
   final DateTime date;
-  final AsyncValue<List<Map<String, dynamic>>> availability;
+  final AsyncValue<AvailabilitySchedule> availability;
   final TimeOfDay? start;
   final TimeOfDay? end;
   final VoidCallback onPickDate;
   final VoidCallback onOpenSchedule;
-  final ValueChanged<Map<String, dynamic>> onSelectSlot;
+  final ValueChanged<AvailabilityInterval> onSelectSlot;
   final VoidCallback onRetry;
 
   @override
@@ -488,7 +487,7 @@ class _ScheduleCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'Slot kosong',
+                  'Jadwal waktu',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),
@@ -515,7 +514,7 @@ class _ScheduleCard extends StatelessWidget {
                 TextButton(onPressed: onRetry, child: const Text('Ulangi')),
               ],
             ),
-            data: (slots) => slots.isEmpty
+            data: (schedule) => !schedule.hasIntervals
                 ? Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
@@ -524,7 +523,7 @@ class _ScheduleCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: const Text(
-                      'Tidak ada slot kosong pada tanggal ini. Coba tanggal lain.',
+                      'Tidak ada jadwal pada tanggal ini. Coba tanggal lain.',
                       style: TextStyle(color: AppColors.muted, fontSize: 12),
                     ),
                   )
@@ -532,22 +531,18 @@ class _ScheduleCard extends StatelessWidget {
                     height: 104,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
-                      itemCount: slots.length,
+                      itemCount: schedule.intervals.length,
                       separatorBuilder: (_, _) => const SizedBox(width: 8),
                       itemBuilder: (_, index) {
-                        final slot = slots[index];
-                        final slotStart = availabilityStart(slot);
-                        final slotEnd = availabilityEnd(slot);
+                        final interval = schedule.intervals[index];
                         final selected =
-                            slotStart != null &&
-                            slotEnd != null &&
-                            start == TimeOfDay.fromDateTime(slotStart) &&
-                            end == TimeOfDay.fromDateTime(slotEnd);
+                            start == TimeOfDay.fromDateTime(interval.start) &&
+                            end == TimeOfDay.fromDateTime(interval.end);
                         return AvailabilitySlotCard(
-                          slot: slot,
+                          interval: interval,
                           selected: selected,
                           compact: true,
-                          onTap: () => onSelectSlot(slot),
+                          onTap: () => onSelectSlot(interval),
                         );
                       },
                     ),
@@ -556,7 +551,7 @@ class _ScheduleCard extends StatelessWidget {
           if (availability.hasValue) ...[
             const SizedBox(height: 8),
             Text(
-              'Ketuk slot untuk mengisi waktu booking otomatis.',
+              'Ketuk slot kosong untuk mengisi waktu booking otomatis. Slot Dipesan tidak dapat dipilih.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],

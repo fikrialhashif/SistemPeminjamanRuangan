@@ -34,6 +34,8 @@ class LoanRepository {
     required double latitude,
     required double longitude,
     required double accuracy,
+    required DateTime gpsTimestamp,
+    required bool gpsIsMock,
   }) async {
     try {
       final response = await _dio.post(
@@ -44,6 +46,8 @@ class LoanRepository {
           'gps_latitude': latitude,
           'gps_longitude': longitude,
           'gps_accuracy': accuracy,
+          'gps_timestamp': gpsTimestamp.toUtc().toIso8601String(),
+          'gps_is_mock': gpsIsMock,
         },
       );
       return Map<String, dynamic>.from(response.data as Map);

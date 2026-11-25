@@ -35,6 +35,7 @@ class FakeBackend implements HttpClientAdapter {
   final List<String> hosts = <String>[];
   final Set<String> failHosts = <String>{};
   bool rejectCheckIn = false;
+  String? rejectCheckInReason;
   bool unauthorizedOnMe = false;
   List<String>? loginRoleNames;
   int bookingId = 9;
@@ -131,11 +132,26 @@ class FakeBackend implements HttpClientAdapter {
     }
     if (path.contains('/resources/1/availability')) {
       return _json({
-        'slots': [
+        'date': '2026-11-17',
+        'open_time': '07:00',
+        'close_time': '22:00',
+        'hours_source': 'room',
+        'intervals': [
           {
-            'starts_at': '2026-11-17T02:00:00Z',
-            'ends_at': '2026-11-17T03:00:00Z',
+            'start': '2026-11-16T19:00:00Z',
+            'end': '2026-11-16T20:00:00Z',
             'available': true,
+            'status': 'free',
+            'status_detail': null,
+            'label': 'Tersedia',
+          },
+          {
+            'start': '2026-11-16T20:00:00Z',
+            'end': '2026-11-16T21:00:00Z',
+            'available': false,
+            'status': 'booked',
+            'status_detail': 'approved',
+            'label': 'Dipesan',
           },
         ],
       });
@@ -196,8 +212,20 @@ class FakeBackend implements HttpClientAdapter {
         return _json({
           'result': 'rejected',
           'rejection_reasons': [
-            'gps: Distance 250.0m exceeds geofence radius of 100m',
+            rejectCheckInReason ??
+                'gps: Distance 250.0m exceeds geofence radius of 100m',
           ],
+          'verification': {
+            'subject_type': 'booking',
+            'subject_id': 9,
+            'accepted': false,
+            'steps': [
+              {'stage': 'location', 'passed': true},
+              {'stage': 'qr', 'passed': true},
+              {'stage': 'face', 'passed': true},
+              {'stage': 'time', 'passed': false},
+            ],
+          },
         });
       }
       return _json({
@@ -206,6 +234,17 @@ class FakeBackend implements HttpClientAdapter {
         'qr_valid': true,
         'gps_valid': true,
         'face_valid': true,
+        'verification': {
+          'subject_type': 'booking',
+          'subject_id': 9,
+          'accepted': true,
+          'steps': [
+            {'stage': 'location', 'passed': true},
+            {'stage': 'qr', 'passed': true},
+            {'stage': 'face', 'passed': true},
+            {'stage': 'time', 'passed': true},
+          ],
+        },
       });
     }
     if (path.endsWith('/face/enroll')) {

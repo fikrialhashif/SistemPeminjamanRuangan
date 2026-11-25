@@ -90,6 +90,9 @@ String checkInDecisionMessage(Map<String, dynamic> result) {
 
 String _reasonFromServer(String reason) {
   final value = reason.toLowerCase();
+  if (value.contains('waktu') || value.contains('window')) {
+    return 'Waktu check-in di luar rentang yang diizinkan.';
+  }
   if (value.contains('qr:') || value.contains('token')) {
     if (value.contains('mismatch')) {
       return 'QR bukan untuk ruangan booking ini.';

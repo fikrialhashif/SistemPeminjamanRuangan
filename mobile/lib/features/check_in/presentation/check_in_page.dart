@@ -10,8 +10,10 @@ import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../../core/formatting/formatters.dart';
 import '../../../core/network/api_error.dart';
 import '../../../core/permissions/app_permissions.dart';
+import '../../../core/verification/verification_steps.dart';
 import '../../../core/widgets/camera_preview_box.dart';
 import '../../bookings/presentation/booking_providers.dart';
 import '../../face/data/face_guidance.dart';
@@ -30,7 +32,6 @@ class CheckInPage extends ConsumerStatefulWidget {
 }
 
 class _CheckInPageState extends ConsumerState<CheckInPage> {
-  static const _steps = ['Lokasi', 'QR', 'Wajah'];
   static const _maxAutoCaptureAttempts = 2;
   static const _frameSampling = 3;
 
@@ -64,7 +65,7 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
   bool get faceRequired => faceEnabled;
 
   String get _detectionStatus {
-    if (submitting) return 'Mengirim...';
+    if (_capturingFrame) return 'Memproses foto...';
     if (!_faceDetected) return 'Mencari wajah...';
     return 'Wajah terdeteksi, pertahankan sebentar.';
   }
@@ -82,32 +83,93 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final booking = ref
+        .watch(bookingDetailProvider(widget.bookingId))
+        .asData
+        ?.value;
+    final roomLocation = _roomLocation(booking);
     return Scaffold(
       appBar: AppBar(title: const Text('Konfirmasi booking')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _StepHeader(steps: _steps, current: step),
+          VerificationStepHeader(current: step),
           const SizedBox(height: 20),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 200),
             child: switch (step) {
-              0 => _locationStep(),
+              0 => _locationStep(roomLocation),
               1 => _qrStep(),
-              _ => _faceStep(),
+              2 => _faceStep(),
+              _ => _timeStep(booking),
             },
           ),
           const SizedBox(height: 24),
           if (message != null) _resultCard(colorScheme),
           const SizedBox(height: 8),
-          _navigation(colorScheme),
+          _navigation(),
         ],
       ),
     );
   }
 
-  Widget _locationStep() {
-    final ready = location != null;
+  Map<String, dynamic>? _roomLocation(Map<String, dynamic>? booking) {
+    final resource = booking?['resource'];
+    if (resource is! Map) return null;
+    final location = resource['location'];
+    if (location is! Map) return null;
+    return Map<String, dynamic>.from(location);
+  }
+
+  int? _radiusOf(Map<String, dynamic> location) {
+    final value = location['radius'];
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '');
+  }
+
+  String _areaDescription(Map<String, dynamic> location) {
+    final polygon = location['polygon'];
+    if (polygon is List && polygon.length >= 3) {
+      return 'Area ruangan: area bebas (${polygon.length} titik).';
+    }
+    final radius = _radiusOf(location);
+    if (radius == null) return 'Area ruangan: radius belum diatur.';
+    return 'Radius area ruangan: ${_formatMeters(radius)}.';
+  }
+
+  String _formatMeters(int meters) {
+    if (meters < 1000) return '$meters m';
+    final km = meters / 1000;
+    final label = km == km.roundToDouble()
+        ? km.toStringAsFixed(0)
+        : km.toStringAsFixed(1);
+    return '$label km';
+  }
+
+  double? _distanceToArea(Map<String, dynamic> roomLocation) {
+    final current = location;
+    if (current == null) return null;
+    final latitude = double.tryParse(
+      roomLocation['latitude']?.toString() ?? '',
+    );
+    final longitude = double.tryParse(
+      roomLocation['longitude']?.toString() ?? '',
+    );
+    if (latitude == null || longitude == null) return null;
+    return distanceBetweenMeters(
+      fromLatitude: current.latitude,
+      fromLongitude: current.longitude,
+      toLatitude: latitude,
+      toLongitude: longitude,
+    );
+  }
+
+  Widget _locationStep(Map<String, dynamic>? roomLocation) {
+    final evidence = location;
+    final ready = evidence != null;
+    final distance = roomLocation == null
+        ? null
+        : _distanceToArea(roomLocation);
     return _StepCard(
       key: const ValueKey('location-step'),
       icon: Icons.my_location,
@@ -116,18 +178,49 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (roomLocation != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(_areaDescription(roomLocation)),
+            ),
           _StatusLine(
             ready: ready,
             readyText: 'Lokasi berhasil diambil.',
             pendingText: 'Lokasi belum diambil.',
           ),
-          if (location != null)
+          if (evidence != null)
             Padding(
               padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                'Akurasi perkiraan: ${location!.accuracy.toStringAsFixed(0)} m',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Akurasi GPS: ${evidence.accuracy.toStringAsFixed(0)} m',
+                  ),
+                  if (distance != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        'Perkiraan jarak ke pusat area: ${distance.toStringAsFixed(0)} m',
+                      ),
+                    ),
+                ],
               ),
             ),
+          if (evidence != null && !evidence.preciseAccuracy) ...[
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: _InfoBanner(
+                icon: Icons.warning_amber_rounded,
+                message: 'Izin lokasi presisi belum aktif. Aktifkan "Lokasi presisi" di pengaturan aplikasi agar akurasi GPS lebih baik.',
+              ),
+            ),
+            OutlinedButton.icon(
+              onPressed: AppPermissions.openSettings,
+              icon: const Icon(Icons.settings),
+              label: const Text('Buka pengaturan'),
+            ),
+          ],
           if (locationError != null)
             Padding(
               padding: const EdgeInsets.only(top: 12),
@@ -201,7 +294,7 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
       key: const ValueKey('face-step'),
       icon: Icons.face_retouching_natural,
       title: 'Langkah 3 - Verifikasi wajah',
-      description: 'Foto depan diambil otomatis saat wajah terdeteksi, lalu foto toleh diambil saat kepala berputar. Check-in langsung dikirim setelah kedua foto selesai.',
+      description: 'Foto depan diambil otomatis saat wajah terdeteksi, lalu foto toleh diambil saat kepala berputar. Setelah kedua foto selesai, lanjut ke langkah waktu.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -255,7 +348,7 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
                         ? 'Hadapkan wajah ke kamera. $_detectionStatus'
                         : faceFrame == null
                         ? 'Foto depan tersimpan. Sekarang tolehkan kepala ke kiri atau kanan. $_detectionStatus'
-                        : 'Foto depan dan tolehan tersimpan. Mengirim check-in...',
+                        : 'Foto depan dan tolehan tersimpan. Lanjut ke langkah waktu.',
                   ),
                 ),
               ),
@@ -297,16 +390,49 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
     );
   }
 
-  Widget _navigation(ColorScheme colorScheme) {
+  Widget _timeStep(Map<String, dynamic>? booking) {
+    final startsAt = booking?['starts_at']?.toString();
+    final endsAt = booking?['ends_at']?.toString();
+    return _StepCard(
+      key: const ValueKey('time-step'),
+      icon: Icons.schedule_rounded,
+      title: 'Langkah 4 - Waktu',
+      description: 'Server akan memeriksa apakah check-in dilakukan dalam rentang waktu yang diizinkan untuk booking ini.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _StatusLine(
+            ready: booking != null,
+            readyText: 'Detail waktu booking tersedia.',
+            pendingText: 'Detail booking belum tersedia.',
+          ),
+          if (startsAt != null && endsAt != null) ...[
+            const SizedBox(height: 10),
+            Text('Mulai: ${formatWibDateTime(startsAt)}'),
+            const SizedBox(height: 4),
+            Text('Selesai: ${formatWibDateTime(endsAt)}'),
+          ],
+          const Padding(
+            padding: EdgeInsets.only(top: 12),
+            child: _InfoBanner(
+              icon: Icons.info_outline,
+              message: 'Aplikasi tidak menentukan sendiri apakah waktu Anda valid. Tekan konfirmasi untuk membiarkan server memutuskan.',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _navigation() {
     final canContinue = switch (step) {
       0 => location != null,
       1 => qrToken != null,
-      _ =>
-        location != null &&
-            qrToken != null &&
-            faceStatusReady &&
+      2 =>
+        faceStatusReady &&
             (!faceRequired ||
                 (faceEnrolled && frontFrame != null && faceFrame != null)),
+      _ => true,
     };
 
     return Row(
@@ -317,20 +443,10 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
             child: const Text('Kembali'),
           ),
         const Spacer(),
-        if (step < 2)
+        if (step < 3)
           FilledButton(
-            onPressed: canContinue ? _nextStep : null,
+            onPressed: canContinue && !submitting ? _nextStep : null,
             child: const Text('Lanjut'),
-          )
-        else if (faceRequired && faceEnrolled)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Text(
-              submitting
-                  ? 'Mengirim check-in...'
-                  : 'Check-in otomatis setelah dua foto selesai',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
           )
         else
           FilledButton.icon(
@@ -382,22 +498,24 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
       step += 1;
       message = null;
     });
-    if (step == 2) _prepareFaceStep();
+    if (step == 2) unawaited(_prepareFaceStep());
   }
 
   void _goBack() {
-    if (step == 2) {
+    if (step == 2 || step == 3) {
       unawaited(_stopFaceDetection());
       final controller = camera;
+      final returningToFace = step == 3;
       setState(() {
         camera = null;
         frontFrame = null;
         faceFrame = null;
         challenge = null;
         faceStatusReady = false;
-        step = 1;
+        step = returningToFace ? 2 : 1;
       });
       controller?.dispose();
+      if (returningToFace) unawaited(_prepareFaceStep());
       return;
     }
     setState(() => step -= 1);
@@ -677,7 +795,7 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
           accepted = null;
           _capturingFrame = false;
         });
-        await _submit(autoFromCapture: true);
+        await _advanceFromFaceCapture();
         return;
       }
     } catch (error) {
@@ -698,6 +816,15 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
     }
   }
 
+  Future<void> _advanceFromFaceCapture() async {
+    await _stopFaceDetection();
+    if (!mounted) return;
+    setState(() {
+      step = 3;
+      message = null;
+    });
+  }
+
   Future<void> _openEnrollment() async {
     await _stopFaceDetection();
     if (!mounted) return;
@@ -706,13 +833,18 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
     if (mounted) await _prepareFaceStep();
   }
 
-  Future<void> _submit({bool autoFromCapture = false}) async {
-    if (submitting || location == null || qrToken == null || !faceStatusReady) {
+  Future<void> _submit() async {
+    if (submitting ||
+        step != 3 ||
+        location == null ||
+        qrToken == null ||
+        !faceStatusReady) {
       return;
     }
     await _stopFaceDetection();
     if (faceRequired && !faceEnrolled) {
       setState(() {
+        step = 2;
         accepted = false;
         message = 'Wajah belum terdaftar. Daftarkan wajah terlebih dahulu.';
       });
@@ -720,6 +852,7 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
     }
     if (faceRequired && (frontFrame == null || faceFrame == null)) {
       setState(() {
+        step = 2;
         accepted = false;
         message = 'Foto depan dan tolehan belum lengkap.';
       });
@@ -732,7 +865,7 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
     });
 
     final challengeType = challenge?['challenge_type']?.toString();
-    var retryAuto = false;
+    var retryFace = false;
     try {
       final result = await ref
           .read(checkInRepositoryProvider)
@@ -780,13 +913,7 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
         return;
       }
 
-      if (faceEnabled) await _renewChallenge();
-      retryAuto =
-          autoFromCapture &&
-          faceEnabled &&
-          hasFaceReason &&
-          !isFaceIdentityMismatch(result) &&
-          _autoCaptureAttempts < _maxAutoCaptureAttempts;
+      retryFace = faceEnabled && hasFaceReason;
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -796,66 +923,12 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
     } finally {
       if (mounted) {
         setState(() => submitting = false);
-        if (retryAuto) unawaited(_startFaceDetection());
+        if (retryFace) {
+          setState(() => step = 2);
+          unawaited(_prepareFaceStep());
+        }
       }
     }
-  }
-}
-
-class _StepHeader extends StatelessWidget {
-  const _StepHeader({required this.steps, required this.current});
-
-  final List<String> steps;
-  final int current;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Row(
-      children: [
-        for (var index = 0; index < steps.length; index++) ...[
-          Expanded(
-            child: Column(
-              children: [
-                CircleAvatar(
-                  radius: 16,
-                  backgroundColor: index <= current
-                      ? colorScheme.primary
-                      : colorScheme.surfaceContainerHighest,
-                  child: index < current
-                      ? Icon(
-                          Icons.check,
-                          size: 18,
-                          color: colorScheme.onPrimary,
-                        )
-                      : Text(
-                          '${index + 1}',
-                          style: TextStyle(
-                            color: index <= current
-                                ? colorScheme.onPrimary
-                                : colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  steps[index],
-                  style: Theme.of(context).textTheme.labelMedium,
-                ),
-              ],
-            ),
-          ),
-          if (index < steps.length - 1)
-            Container(
-              height: 2,
-              width: 24,
-              color: index < current
-                  ? colorScheme.primary
-                  : colorScheme.surfaceContainerHighest,
-            ),
-        ],
-      ],
-    );
   }
 }
 

@@ -10,6 +10,109 @@ enum FaceGuidancePhase { front, turn, done }
 
 enum FaceGuidanceAction { none, captureFront, captureTurn }
 
+enum FaceEnrollmentAction { none, captureFront, captureTurn }
+
+class FaceEnrollmentGuidanceTracker {
+  FaceEnrollmentGuidanceTracker({this.frontYawMax = 10, this.turnYawMin = 25});
+
+  final double frontYawMax;
+  final double turnYawMin;
+  static const requiredSamples = 3;
+  static const frontStableFrames = 4;
+  static const turnStableFrames = 3;
+
+  int _frontFrames = 0;
+  int _turnFrames = 0;
+  int _firstTurnSign = 0;
+  bool _frontCaptured = false;
+  bool _firstTurnCaptured = false;
+  bool _secondTurnCaptured = false;
+
+  bool get frontCaptured => _frontCaptured;
+  bool get complete => _secondTurnCaptured;
+
+  int get capturedCount =>
+      (_frontCaptured ? 1 : 0) +
+      (_firstTurnCaptured ? 1 : 0) +
+      (_secondTurnCaptured ? 1 : 0);
+
+  void reset() {
+    _frontFrames = 0;
+    _turnFrames = 0;
+    _firstTurnSign = 0;
+    _frontCaptured = false;
+    _firstTurnCaptured = false;
+    _secondTurnCaptured = false;
+  }
+
+  void markFrontCaptured() {
+    _frontCaptured = true;
+    _frontFrames = 0;
+    _turnFrames = 0;
+  }
+
+  void markTurnCaptured(double yaw) {
+    if (!_firstTurnCaptured) {
+      _firstTurnCaptured = true;
+      _firstTurnSign = yaw.sign.toInt();
+    } else {
+      _secondTurnCaptured = true;
+    }
+    _frontFrames = 0;
+    _turnFrames = 0;
+  }
+
+  FaceEnrollmentAction update({
+    required bool faceDetected,
+    required double? yaw,
+  }) {
+    if (!faceDetected || yaw == null) {
+      _frontFrames = 0;
+      _turnFrames = 0;
+      return FaceEnrollmentAction.none;
+    }
+    if (_secondTurnCaptured) return FaceEnrollmentAction.none;
+
+    if (!_frontCaptured) {
+      if (yaw.abs() <= frontYawMax) {
+        _frontFrames += 1;
+        if (_frontFrames >= frontStableFrames) {
+          _frontFrames = 0;
+          return FaceEnrollmentAction.captureFront;
+        }
+      } else {
+        _frontFrames = 0;
+      }
+      return FaceEnrollmentAction.none;
+    }
+
+    if (!_firstTurnCaptured) {
+      if (yaw.abs() >= turnYawMin) {
+        _turnFrames += 1;
+        if (_turnFrames >= turnStableFrames) {
+          _turnFrames = 0;
+          return FaceEnrollmentAction.captureTurn;
+        }
+      } else {
+        _turnFrames = 0;
+      }
+      return FaceEnrollmentAction.none;
+    }
+
+    final sign = yaw.sign.toInt();
+    if (sign != 0 && sign != _firstTurnSign && yaw.abs() >= turnYawMin) {
+      _turnFrames += 1;
+      if (_turnFrames >= turnStableFrames) {
+        _turnFrames = 0;
+        return FaceEnrollmentAction.captureTurn;
+      }
+    } else {
+      _turnFrames = 0;
+    }
+    return FaceEnrollmentAction.none;
+  }
+}
+
 class FaceGuidanceTracker {
   FaceGuidanceTracker({this.frontYawMax = 10, this.turnYawMin = 22});
 

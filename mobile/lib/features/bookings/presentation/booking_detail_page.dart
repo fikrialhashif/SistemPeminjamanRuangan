@@ -195,7 +195,7 @@ class _BookingDetailBody extends StatelessWidget {
                 valid: latest['gps_valid'] == true,
                 detail: latest['gps_accuracy'] == null
                     ? null
-                    : 'Akurasi ${latest['gps_accuracy']} m',
+                    : 'Akurasi GPS ${latest['gps_accuracy']} m',
               ),
               _ProofRow(
                 label: 'Wajah',

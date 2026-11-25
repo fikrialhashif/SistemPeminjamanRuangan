@@ -15,12 +15,14 @@ class LocationEvidence {
     required this.accuracy,
     required this.timestamp,
     required this.isMock,
+    this.preciseAccuracy = true,
   });
   final double latitude;
   final double longitude;
   final double accuracy;
   final DateTime timestamp;
   final bool isMock;
+  final bool preciseAccuracy;
 
   Map<String, Object> toJson() => {
     'gps_latitude': latitude,
@@ -42,9 +44,18 @@ class LocationService {
   Future<PermissionState> requestPermission() =>
       AppPermissions.request(Permission.location);
 
+  Future<LocationAccuracyStatus> locationAccuracyStatus() async {
+    try {
+      return await Geolocator.getLocationAccuracy();
+    } catch (_) {
+      return LocationAccuracyStatus.unknown;
+    }
+  }
+
   Future<LocationEvidence> currentEvidence() async {
+    final accuracyStatus = await locationAccuracyStatus();
     final position = await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+      locationSettings: const LocationSettings(accuracy: LocationAccuracy.best),
     );
     return LocationEvidence(
       latitude: position.latitude,
@@ -52,6 +63,19 @@ class LocationService {
       accuracy: position.accuracy,
       timestamp: position.timestamp,
       isMock: position.isMocked,
+      preciseAccuracy: accuracyStatus != LocationAccuracyStatus.reduced,
     );
   }
 }
+
+double distanceBetweenMeters({
+  required double fromLatitude,
+  required double fromLongitude,
+  required double toLatitude,
+  required double toLongitude,
+}) => Geolocator.distanceBetween(
+  fromLatitude,
+  fromLongitude,
+  toLatitude,
+  toLongitude,
+);

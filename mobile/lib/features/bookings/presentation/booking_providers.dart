@@ -1,9 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/availability_schedule.dart';
 import '../data/booking_repository.dart';
 
 final availabilityProvider =
-    FutureProvider.family<List<Map<String, dynamic>>, AvailabilityQuery>(
+    FutureProvider.family<AvailabilitySchedule, AvailabilityQuery>(
       (ref, query) => ref
           .read(bookingRepositoryProvider)
           .availability(query.resourceId, query.date),

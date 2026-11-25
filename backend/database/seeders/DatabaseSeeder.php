@@ -44,6 +44,18 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Gedung C', 'address' => 'Lantai 1, Gedung C', 'latitude' => -6.2095000, 'longitude' => 106.8465000, 'radius' => 150],
         ])->map(fn ($l) => Location::firstOrCreate(['name' => $l['name']], $l));
 
+        $assetPickupLocation = Location::updateOrCreate(
+            ['name' => 'Peminjaman Aset'],
+            [
+                'address' => 'Lokasi serah-terima aset, Gedung A',
+                'latitude' => -6.2088000,
+                'longitude' => 106.8456000,
+                'radius' => 100,
+                'open_time' => '07:00:00',
+                'close_time' => '22:00:00',
+            ],
+        );
+
         $admin = User::firstOrCreate(
             ['email' => 'admin@example.com'],
             ['name' => 'Admin User', 'password' => Hash::make('password'), 'department_id' => $departments[0]->id],
@@ -77,7 +89,10 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Ruang Rapat A1'],
             ['type' => ResourceType::ROOM, 'location_id' => $locations[0]->id, 'category_id' => $roomCategories['Ruang rapat']->id, 'is_active' => true],
         );
-        $room1->room()->firstOrCreate(['resource_id' => $room1->id], ['capacity' => 20, 'facilities' => ['Proyektor', 'Papan Tulis', 'Pendingin Udara']]);
+        $room1Detail = $room1->room()->firstOrCreate(['resource_id' => $room1->id], ['capacity' => 20, 'facilities' => ['Proyektor', 'Papan Tulis', 'Pendingin Udara']]);
+        if ($room1Detail->open_time === null || $room1Detail->close_time === null) {
+            $room1Detail->update(['open_time' => '07:00:00', 'close_time' => '22:00:00']);
+        }
         $room1->rules()->firstOrCreate(['resource_id' => $room1->id], [
             'buffer_minutes' => 15,
             'min_duration_minutes' => 30,
@@ -91,7 +106,10 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Lab Komputer B2'],
             ['type' => ResourceType::ROOM, 'location_id' => $locations[1]->id, 'category_id' => $roomCategories['Laboratorium']->id, 'is_active' => true],
         );
-        $room2->room()->firstOrCreate(['resource_id' => $room2->id], ['capacity' => 40, 'facilities' => ['Komputer', 'Proyektor', 'Pendingin Udara']]);
+        $room2Detail = $room2->room()->firstOrCreate(['resource_id' => $room2->id], ['capacity' => 40, 'facilities' => ['Komputer', 'Proyektor', 'Pendingin Udara']]);
+        if ($room2Detail->open_time === null || $room2Detail->close_time === null) {
+            $room2Detail->update(['open_time' => '07:00:00', 'close_time' => '22:00:00']);
+        }
         $room2->rules()->firstOrCreate(['resource_id' => $room2->id], [
             'buffer_minutes' => 10,
             'min_duration_minutes' => 60,
@@ -101,9 +119,9 @@ class DatabaseSeeder extends Seeder
             'cancellation_minutes_before' => 30,
         ]);
 
-        $asset1 = Resource::firstOrCreate(
+        $asset1 = Resource::updateOrCreate(
             ['name' => 'Proyektor Portable'],
-            ['type' => ResourceType::ASSET, 'location_id' => $locations[2]->id, 'category_id' => $assetCategories['Proyektor']->id, 'is_active' => true],
+            ['type' => ResourceType::ASSET, 'location_id' => $assetPickupLocation->id, 'category_id' => $assetCategories['Proyektor']->id, 'is_active' => true],
         );
         $asset1->asset()->firstOrCreate(['resource_id' => $asset1->id], ['code' => 'PRJ-001', 'condition' => 'good']);
         $asset1->rules()->firstOrCreate(['resource_id' => $asset1->id], [
@@ -115,9 +133,9 @@ class DatabaseSeeder extends Seeder
             'cancellation_minutes_before' => 60,
         ]);
 
-        $asset2 = Resource::firstOrCreate(
+        $asset2 = Resource::updateOrCreate(
             ['name' => 'Kamera DSLR'],
-            ['type' => ResourceType::ASSET, 'location_id' => $locations[2]->id, 'category_id' => $assetCategories['Kamera']->id, 'is_active' => true],
+            ['type' => ResourceType::ASSET, 'location_id' => $assetPickupLocation->id, 'category_id' => $assetCategories['Kamera']->id, 'is_active' => true],
         );
         $asset2->asset()->firstOrCreate(['resource_id' => $asset2->id], ['code' => 'CAM-001', 'condition' => 'good']);
         $asset2->rules()->firstOrCreate(['resource_id' => $asset2->id], [

@@ -9,7 +9,7 @@ use App\Http\Requests\StoreResourceRequest;
 use App\Http\Requests\UpdateResourceRequest;
 use App\Models\Category;
 use App\Models\Resource;
-use App\Services\BookingService;
+use App\Services\AvailabilityService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,7 +18,7 @@ use Illuminate\Validation\ValidationException;
 class ResourceController extends Controller
 {
     public function __construct(
-        protected BookingService $bookingService,
+        protected AvailabilityService $availabilityService,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -146,7 +146,12 @@ class ResourceController extends Controller
 
     private function presentResource(Resource $resource): Resource
     {
-        $resource->setAttribute('category', $resource->category?->name);
+        $category = $resource->getRelationValue('category');
+
+        if ($category !== null) {
+            $resource->setAttribute('category', $category->name);
+        }
+
         $resource->unsetRelation('category');
 
         return $resource;
@@ -186,8 +191,11 @@ class ResourceController extends Controller
             'date' => ['required', 'date'],
         ]);
 
-        $slots = $this->bookingService->getAvailability($resource, Carbon::parse($request->input('date')));
+        $schedule = $this->availabilityService->schedule(
+            $resource,
+            Carbon::parse($request->input('date')),
+        );
 
-        return response()->json(['slots' => $slots]);
+        return response()->json($schedule->toArray());
     }
 }

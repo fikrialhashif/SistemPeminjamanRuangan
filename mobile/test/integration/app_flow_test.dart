@@ -31,7 +31,7 @@ void main() {
 
   tearDown(() => container.dispose());
 
-  test('login -> katalog -> booking -> check-in tiga faktor', () async {
+  test('login -> katalog -> booking -> check-in empat tahap', () async {
     final login = await container
         .read(authRepositoryProvider)
         .login('budi@example.com', 'secret');
@@ -97,6 +97,9 @@ void main() {
           faceChallengeResponse: {'action': challenge['challenge_type']},
         );
     expect(faceAttempt['result'], 'accepted');
+    final verification = faceAttempt['verification'] as Map?;
+    expect(verification?['accepted'], true);
+    expect((verification?['steps'] as List).length, 4);
     final faceBody = backend.lastJsonBody('/bookings/9/check-in')!;
     expect(faceBody['face_image'], isNotNull);
     expect(faceBody['face_front_image'], isNotNull);
@@ -128,6 +131,33 @@ void main() {
       contains('di luar area yang diizinkan'),
     );
   });
+
+  test(
+    'penolakan waktu dari server ditampilkan sebagai alasan waktu',
+    () async {
+      backend.rejectCheckIn = true;
+      backend.rejectCheckInReason =
+          'Waktu verifikasi di luar rentang yang diizinkan.';
+      final attempt = await container
+          .read(checkInRepositoryProvider)
+          .checkIn(
+            bookingId: '9',
+            qrToken: 'signed-qr-token',
+            location: LocationEvidence(
+              latitude: 0.5,
+              longitude: 101.4,
+              accuracy: 10,
+              timestamp: DateTime.utc(2026, 11, 17, 2),
+              isMock: false,
+            ),
+          );
+
+      expect(
+        checkInDecisionMessage(attempt),
+        'Waktu check-in di luar rentang yang diizinkan.',
+      );
+    },
+  );
 
   test('401 membersihkan token dan memicu sesi kedaluwarsa', () async {
     storage.token = 'expired-token';

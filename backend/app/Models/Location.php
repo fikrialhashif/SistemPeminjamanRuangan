@@ -17,6 +17,8 @@ class Location extends Model
         'longitude',
         'radius',
         'polygon',
+        'open_time',
+        'close_time',
     ];
 
     protected function casts(): array

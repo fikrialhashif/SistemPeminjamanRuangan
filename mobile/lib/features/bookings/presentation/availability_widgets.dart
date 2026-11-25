@@ -1,61 +1,69 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/formatting/formatters.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_components.dart';
+import '../data/availability_schedule.dart';
 
-DateTime? availabilityStart(Map<String, dynamic> slot) =>
-    parseWibDateTime(slot['start']);
+DateTime availabilityStart(AvailabilityInterval interval) => interval.start;
 
-DateTime? availabilityEnd(Map<String, dynamic> slot) =>
-    parseWibDateTime(slot['end']);
+DateTime availabilityEnd(AvailabilityInterval interval) => interval.end;
 
-String availabilityDurationLabel(Map<String, dynamic> slot) {
-  final start = availabilityStart(slot);
-  final end = availabilityEnd(slot);
-  if (start == null || end == null) return '-';
-  final minutes = end.difference(start).inMinutes;
+String availabilityDurationLabel(AvailabilityInterval interval) {
+  final minutes = interval.end.difference(interval.start).inMinutes;
   if (minutes < 60) return '$minutes menit';
   final hours = minutes ~/ 60;
   final remainder = minutes % 60;
   return remainder == 0 ? '$hours jam' : '$hours jam $remainder mnt';
 }
 
+String availabilityTimeLabel(AvailabilityInterval interval) =>
+    '${formatClock(interval.start)} - ${formatClock(interval.end)}';
+
+String formatClock(DateTime value) =>
+    '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+
 class AvailabilitySlotCard extends StatelessWidget {
   const AvailabilitySlotCard({
-    required this.slot,
+    required this.interval,
     required this.selected,
     required this.onTap,
     this.compact = false,
     super.key,
   });
 
-  final Map<String, dynamic> slot;
+  final AvailabilityInterval interval;
   final bool selected;
   final VoidCallback onTap;
   final bool compact;
 
   @override
   Widget build(BuildContext context) {
-    final start = formatWibTime(slot['start']);
-    final end = formatWibTime(slot['end']);
-    final duration = availabilityDurationLabel(slot);
+    final booked = !interval.selectable;
+    final timeLabel = availabilityTimeLabel(interval);
+    final duration = availabilityDurationLabel(interval);
+    final background = booked
+        ? Theme.of(context).colorScheme.surfaceContainerHighest
+        : selected
+        ? AppColors.mintSoft
+        : AppColors.surface;
+    final borderColor = booked
+        ? AppColors.border
+        : selected
+        ? AppColors.primary
+        : AppColors.border;
 
     return Material(
-      color: selected ? AppColors.mintSoft : AppColors.surface,
+      color: background,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
-        onTap: onTap,
+        onTap: booked ? null : onTap,
         borderRadius: BorderRadius.circular(16),
         child: Container(
           width: compact ? 168 : null,
           padding: EdgeInsets.all(compact ? 12 : 14),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: selected ? AppColors.primary : AppColors.border,
-              width: selected ? 1.5 : 1,
-            ),
+            border: Border.all(color: borderColor, width: selected ? 1.5 : 1),
           ),
           child: compact
               ? Column(
@@ -63,15 +71,17 @@ class AvailabilitySlotCard extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        const Icon(
-                          Icons.schedule_rounded,
+                        Icon(
+                          booked
+                              ? Icons.event_busy_rounded
+                              : Icons.schedule_rounded,
                           size: 14,
-                          color: AppColors.primary,
+                          color: booked ? AppColors.muted : AppColors.primary,
                         ),
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            '$start - $end',
+                            timeLabel,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -88,7 +98,15 @@ class AvailabilitySlotCard extends StatelessWidget {
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     const SizedBox(height: 6),
-                    const AppPill(label: 'Kosong'),
+                    AppPill(
+                      label: booked ? interval.detailLabel : 'Kosong',
+                      backgroundColor: booked
+                          ? AppColors.border
+                          : AppColors.mintSoft,
+                      foregroundColor: booked
+                          ? AppColors.muted
+                          : AppColors.primary,
+                    ),
                   ],
                 )
               : Row(
@@ -97,7 +115,7 @@ class AvailabilitySlotCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          start,
+                          formatClock(interval.start),
                           style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w800,
@@ -105,7 +123,7 @@ class AvailabilitySlotCard extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          's.d. $end',
+                          's.d. ${formatClock(interval.end)}',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ],
@@ -125,9 +143,9 @@ class AvailabilitySlotCard extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 3),
-                          const Text(
-                            'Slot kosong',
-                            style: TextStyle(
+                          Text(
+                            booked ? interval.detailLabel : 'Slot kosong',
+                            style: const TextStyle(
                               color: AppColors.muted,
                               fontSize: 12,
                             ),
@@ -135,12 +153,13 @@ class AvailabilitySlotCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                    Icon(
-                      selected
-                          ? Icons.check_circle_rounded
-                          : Icons.radio_button_unchecked_rounded,
-                      color: selected ? AppColors.primary : AppColors.muted,
-                    ),
+                    if (!booked)
+                      Icon(
+                        selected
+                            ? Icons.check_circle_rounded
+                            : Icons.radio_button_unchecked_rounded,
+                        color: selected ? AppColors.primary : AppColors.muted,
+                      ),
                   ],
                 ),
         ),

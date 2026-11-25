@@ -115,51 +115,6 @@ class BookingService
         ]);
     }
 
-    public function getAvailability(Resource $resource, Carbon $date): array
-    {
-        $resource->loadMissing('rules');
-
-        $dayStart = $date->copy()->startOfDay()->setHour(7);
-        $dayEnd = $date->copy()->startOfDay()->setHour(22);
-
-        $slotHoldingStatuses = collect(BookingStatus::cases())
-            ->filter(fn (BookingStatus $s) => $s->holdsSlot())
-            ->map(fn (BookingStatus $s) => $s->value)
-            ->values()
-            ->all();
-
-        $bookings = Booking::where('resource_id', $resource->id)
-            ->whereIn('status', $slotHoldingStatuses)
-            ->where('starts_at', '<', $dayEnd)
-            ->where('ends_at', '>', $dayStart)
-            ->orderBy('starts_at')
-            ->get(['starts_at', 'ends_at']);
-
-        $buffer = $resource->rules?->buffer_minutes ?? 0;
-        $slots = [];
-        $cursor = $dayStart->copy();
-
-        foreach ($bookings as $booking) {
-            $bookingStart = $booking->starts_at->copy()->subMinutes($buffer);
-            if ($cursor < $bookingStart) {
-                $slots[] = [
-                    'start' => $cursor->toIso8601String(),
-                    'end' => $bookingStart->toIso8601String(),
-                ];
-            }
-            $cursor = $booking->ends_at->copy()->addMinutes($buffer);
-        }
-
-        if ($cursor < $dayEnd) {
-            $slots[] = [
-                'start' => $cursor->toIso8601String(),
-                'end' => $dayEnd->toIso8601String(),
-            ];
-        }
-
-        return $slots;
-    }
-
     private function validateResourceActive(Resource $resource): void
     {
         if (! $resource->is_active) {

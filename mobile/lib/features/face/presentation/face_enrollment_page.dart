@@ -1,13 +1,16 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/network/api_error.dart';
 import '../../../core/permissions/app_permissions.dart';
 import '../../../core/widgets/camera_preview_box.dart';
+import '../data/face_guidance.dart';
 import '../data/face_repository.dart';
 
 class FaceEnrollmentPage extends ConsumerStatefulWidget {
@@ -18,7 +21,7 @@ class FaceEnrollmentPage extends ConsumerStatefulWidget {
 }
 
 class _FaceEnrollmentPageState extends ConsumerState<FaceEnrollmentPage> {
-  static const _steps = ['turn_left', 'turn_right', 'front'];
+  static const _frameSampling = 3;
 
   CameraController? camera;
   bool consent = false;
@@ -27,11 +30,22 @@ class _FaceEnrollmentPageState extends ConsumerState<FaceEnrollmentPage> {
   bool enrolling = false;
   bool alreadyEnrolled = false;
   bool canOpenSettings = false;
-  int stepIndex = 0;
   final List<Uint8List> frames = [];
   final List<String> poses = [];
   String? status;
   String? error;
+
+  FaceDetector? _faceDetector;
+  final FaceEnrollmentGuidanceTracker _guidance =
+      FaceEnrollmentGuidanceTracker();
+  bool _faceDetected = false;
+  double? _faceYaw;
+  int _frameCounter = 0;
+  bool _processingFrame = false;
+
+  bool get _busy => capturing || enrolling;
+
+  int get _capturedCount => _guidance.capturedCount;
 
   @override
   void initState() {
@@ -41,11 +55,16 @@ class _FaceEnrollmentPageState extends ConsumerState<FaceEnrollmentPage> {
 
   @override
   void dispose() {
+    unawaited(_stopDetection());
+    unawaited(_faceDetector?.close() ?? Future<void>.value());
+    frames.clear();
+    poses.clear();
     camera?.dispose();
     super.dispose();
   }
 
   Future<void> _initCamera() async {
+    await _stopDetection();
     final previous = camera;
     camera = null;
     await previous?.dispose();
@@ -93,7 +112,7 @@ class _FaceEnrollmentPageState extends ConsumerState<FaceEnrollmentPage> {
         selected,
         ResolutionPreset.medium,
         enableAudio: false,
-        imageFormatGroup: ImageFormatGroup.jpeg,
+        imageFormatGroup: cameraImageFormatGroup(),
       );
       await controller.initialize();
 
@@ -107,6 +126,7 @@ class _FaceEnrollmentPageState extends ConsumerState<FaceEnrollmentPage> {
         initializing = false;
       });
       await _loadStatus();
+      if (consent) unawaited(_startDetection());
     } catch (initError) {
       if (!mounted) return;
       setState(() {
@@ -126,44 +146,153 @@ class _FaceEnrollmentPageState extends ConsumerState<FaceEnrollmentPage> {
     }
   }
 
-  String _instruction(String pose) => switch (pose) {
-    'turn_left' => 'Tolehkan kepala ke kiri, lalu tahan sampai foto diambil.',
-    'turn_right' => 'Tolehkan kepala ke kanan, lalu tahan sampai foto diambil.',
-    _ => 'Hadap lurus ke kamera, lalu tahan sampai foto diambil.',
-  };
+  Future<void> _toggleConsent(bool value) async {
+    if (value) {
+      setState(() => consent = true);
+      await _startDetection();
+      return;
+    }
 
-  String _stepLabel(String pose) => switch (pose) {
-    'turn_left' => 'Toleh kiri',
-    'turn_right' => 'Toleh kanan',
-    _ => 'Hadap lurus',
-  };
+    await _stopDetection();
+    if (!mounted) return;
+    setState(() {
+      consent = false;
+      _clearSamples();
+      status = null;
+      error = null;
+    });
+  }
 
-  Future<void> _captureStep() async {
+  Future<void> _startDetection() async {
     final controller = camera;
-    if (controller == null || capturing || enrolling) return;
+    if (!consent ||
+        _busy ||
+        _guidance.complete ||
+        controller == null ||
+        !controller.value.isInitialized ||
+        controller.value.isStreamingImages) {
+      return;
+    }
+
+    _faceDetector ??= FaceDetector(
+      options: FaceDetectorOptions(
+        enableTracking: true,
+        performanceMode: FaceDetectorMode.accurate,
+        minFaceSize: 0.15,
+      ),
+    );
+    _frameCounter = 0;
+    _processingFrame = false;
+    try {
+      await controller.startImageStream(_onCameraImage);
+    } catch (detectionError) {
+      if (!mounted) return;
+      setState(() => error = apiErrorMessage(detectionError));
+    }
+  }
+
+  Future<void> _stopDetection() async {
+    final controller = camera;
+    if (controller != null && controller.value.isStreamingImages) {
+      await controller.stopImageStream();
+    }
+  }
+
+  Future<void> _onCameraImage(CameraImage image) async {
+    if (!mounted ||
+        !consent ||
+        _busy ||
+        _processingFrame ||
+        _guidance.complete) {
+      return;
+    }
+    _frameCounter += 1;
+    if (_frameCounter % _frameSampling != 0) return;
+    _processingFrame = true;
+    try {
+      final detector = _faceDetector;
+      final controller = camera;
+      if (detector == null || controller == null) return;
+      final inputImage = inputImageFromCameraImage(image, controller);
+      if (inputImage == null) return;
+      final faces = await detector.processImage(inputImage);
+      if (!mounted ||
+          !consent ||
+          _busy ||
+          !controller.value.isStreamingImages) {
+        return;
+      }
+      final face = faces.isEmpty
+          ? null
+          : faces.reduce(
+              (a, b) => a.boundingBox.width >= b.boundingBox.width ? a : b,
+            );
+      final detected = face != null;
+      final yaw = face?.headEulerAngleY;
+      final action = _guidance.update(faceDetected: detected, yaw: yaw);
+      if (detected != _faceDetected || yaw != _faceYaw) {
+        setState(() {
+          _faceDetected = detected;
+          _faceYaw = yaw;
+        });
+      }
+      if (action != FaceEnrollmentAction.none) {
+        await _stopDetection();
+        unawaited(_captureSample(action: action, yaw: yaw));
+      }
+    } catch (_) {
+      return;
+    } finally {
+      _processingFrame = false;
+    }
+  }
+
+  Future<void> _captureSample({
+    required FaceEnrollmentAction action,
+    required double? yaw,
+  }) async {
+    final controller = camera;
+    if (controller == null || _busy || !consent) return;
+
+    final isFront = action == FaceEnrollmentAction.captureFront;
+    final pose = isFront
+        ? 'front'
+        : (yaw ?? 0) < 0
+        ? 'turn_left'
+        : 'turn_right';
 
     setState(() {
       capturing = true;
       error = null;
-      status = 'Mengambil sampel $_currentStepLabel...';
+      status = isFront
+          ? 'Mengambil sampel hadap lurus...'
+          : 'Mengambil sampel tolehan...';
     });
 
     try {
       final frame = await ref.read(faceRepositoryProvider).capture(controller);
       if (!mounted) return;
 
-      final pose = _steps[stepIndex];
+      if (isFront) {
+        _guidance.markFrontCaptured();
+      } else {
+        _guidance.markTurnCaptured(yaw ?? 0);
+      }
+
       setState(() {
         frames.add(frame);
         poses.add(pose);
-        stepIndex++;
         capturing = false;
-        status = stepIndex < _steps.length
-            ? 'Sampel tersimpan. ${_instruction(_steps[stepIndex])}'
-            : 'Semua sampel terkumpul. Menyimpan data wajah...';
+        status = _guidance.complete
+            ? 'Semua sampel terkumpul. Menyimpan data wajah...'
+            : null;
       });
 
-      if (stepIndex == _steps.length) await _enroll();
+      if (_guidance.complete) {
+        await _enroll();
+      } else {
+        unawaited(_startDetection());
+      }
     } catch (captureError) {
       if (!mounted) return;
       setState(() {
@@ -171,23 +300,37 @@ class _FaceEnrollmentPageState extends ConsumerState<FaceEnrollmentPage> {
         status = null;
         error = apiErrorMessage(captureError);
       });
+      if (consent) unawaited(_startDetection());
     }
   }
 
-  String get _currentStepLabel => _stepLabelOf(_steps[stepIndex]);
+  void _clearSamples() {
+    _guidance.reset();
+    frames.clear();
+    poses.clear();
+    _faceDetected = false;
+    _faceYaw = null;
+  }
 
-  String _stepLabelOf(String pose) => switch (pose) {
-    'turn_left' => 'toleh kiri',
-    'turn_right' => 'toleh kanan',
-    _ => 'hadap lurus',
-  };
+  Future<void> _retry() async {
+    await _stopDetection();
+    if (!mounted) return;
+    setState(() {
+      _clearSamples();
+      status = null;
+      error = null;
+    });
+    if (consent) await _startDetection();
+  }
 
   Future<void> _enroll() async {
     if (enrolling || frames.isEmpty) return;
 
+    await _stopDetection();
     setState(() {
       enrolling = true;
       error = null;
+      status = 'Menyimpan data wajah...';
     });
 
     try {
@@ -225,18 +368,9 @@ class _FaceEnrollmentPageState extends ConsumerState<FaceEnrollmentPage> {
         enrolling = false;
         status = null;
         error = apiErrorMessage(enrollError);
+        _clearSamples();
       });
     }
-  }
-
-  void _reset() {
-    setState(() {
-      frames.clear();
-      poses.clear();
-      stepIndex = 0;
-      status = null;
-      error = null;
-    });
   }
 
   Future<void> _delete() async {
@@ -261,18 +395,56 @@ class _FaceEnrollmentPageState extends ConsumerState<FaceEnrollmentPage> {
     );
     if (confirmed != true) return;
 
+    await _stopDetection();
     try {
       await ref.read(faceRepositoryProvider).delete();
       if (!mounted) return;
       setState(() {
         alreadyEnrolled = false;
-        _reset();
+        consent = false;
+        _clearSamples();
         status = 'Data wajah dihapus.';
       });
     } catch (deleteError) {
       if (!mounted) return;
       setState(() => error = apiErrorMessage(deleteError));
     }
+  }
+
+  String get _stepTitle {
+    if (enrolling) return 'Menyimpan data wajah...';
+    if (capturing) return 'Mengambil sampel...';
+    final step = (_capturedCount + 1).clamp(
+      1,
+      FaceEnrollmentGuidanceTracker.requiredSamples,
+    );
+    return 'Langkah $step dari ${FaceEnrollmentGuidanceTracker.requiredSamples}';
+  }
+
+  String get _poseTitle => switch (_capturedCount) {
+    0 => 'Hadap lurus',
+    1 => 'Toleh sisi pertama',
+    _ => 'Toleh sisi sebaliknya',
+  };
+
+  String get _instruction {
+    if (enrolling) return 'Menyimpan data wajah...';
+    if (capturing) return 'Tahan posisi, foto sedang diambil.';
+    if (_guidance.complete) return 'Semua sampel sudah diambil.';
+    if (!consent) {
+      return 'Centang persetujuan untuk memulai pengambilan foto otomatis.';
+    }
+    return switch (_capturedCount) {
+      0 => 'Hadapkan wajah lurus ke kamera, lalu tahan sampai foto diambil otomatis.',
+      1 => 'Tolehkan kepala ke salah satu sisi (kiri atau kanan), lalu tahan sampai foto diambil otomatis.',
+      _ => 'Sekarang tolehkan kepala ke sisi sebaliknya, lalu tahan sampai foto diambil otomatis.',
+    };
+  }
+
+  String get _detectionStatus {
+    if (_guidance.complete) return 'Sampel lengkap.';
+    if (!_faceDetected) return 'Mencari wajah...';
+    return 'Wajah terdeteksi, pertahankan posisi.';
   }
 
   @override
@@ -349,10 +521,8 @@ class _FaceEnrollmentPageState extends ConsumerState<FaceEnrollmentPage> {
   }
 
   Widget _instructionCard() {
-    final pose = stepIndex < _steps.length ? _steps[stepIndex] : 'front';
-    final instruction = stepIndex < _steps.length
-        ? _instruction(pose)
-        : 'Menyimpan data wajah...';
+    final showDetection =
+        consent && !_busy && !_guidance.complete && camera != null;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -362,9 +532,10 @@ class _FaceEnrollmentPageState extends ConsumerState<FaceEnrollmentPage> {
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
-            pose == 'front'
+            _capturedCount == 0
                 ? Icons.face_retouching_natural
                 : Icons.rotate_right,
             color: Colors.white,
@@ -375,9 +546,9 @@ class _FaceEnrollmentPageState extends ConsumerState<FaceEnrollmentPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  stepIndex < _steps.length
-                      ? 'Langkah ${stepIndex + 1} dari ${_steps.length}: ${_stepLabel(pose)}'
-                      : 'Menyimpan data wajah...',
+                  _guidance.complete || enrolling
+                      ? _stepTitle
+                      : '$_stepTitle - $_poseTitle',
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -386,9 +557,20 @@ class _FaceEnrollmentPageState extends ConsumerState<FaceEnrollmentPage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  instruction,
+                  _instruction,
                   style: const TextStyle(color: Colors.white, height: 1.35),
                 ),
+                if (showDetection) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    _detectionStatus,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -399,7 +581,11 @@ class _FaceEnrollmentPageState extends ConsumerState<FaceEnrollmentPage> {
 
   Widget _controls() {
     final scheme = Theme.of(context).colorScheme;
-    final allCaptured = stepIndex == _steps.length;
+    final progress =
+        (_capturedCount / FaceEnrollmentGuidanceTracker.requiredSamples).clamp(
+          0.0,
+          1.0,
+        );
 
     return Container(
       margin: const EdgeInsets.all(16),
@@ -414,9 +600,7 @@ class _FaceEnrollmentPageState extends ConsumerState<FaceEnrollmentPage> {
         children: [
           CheckboxListTile(
             value: consent,
-            onChanged: enrolling || capturing
-                ? null
-                : (value) => setState(() => consent = value ?? false),
+            onChanged: _busy ? null : (value) => _toggleConsent(value ?? false),
             controlAffinity: ListTileControlAffinity.leading,
             contentPadding: EdgeInsets.zero,
             dense: true,
@@ -442,44 +626,39 @@ class _FaceEnrollmentPageState extends ConsumerState<FaceEnrollmentPage> {
               style: const TextStyle(color: Colors.redAccent, fontSize: 13),
             ),
           ],
-          if (stepIndex > 0 || enrolling) ...[
+          if (_capturedCount > 0 || enrolling) ...[
             const SizedBox(height: 12),
-            LinearProgressIndicator(value: stepIndex / _steps.length),
+            LinearProgressIndicator(value: progress),
             const SizedBox(height: 6),
             Text(
-              'Sampel $stepIndex dari ${_steps.length}',
+              'Sampel $_capturedCount dari ${FaceEnrollmentGuidanceTracker.requiredSamples}',
               style: const TextStyle(color: Colors.white70, fontSize: 12),
             ),
           ],
           const SizedBox(height: 12),
-          FilledButton.icon(
-            onPressed: !consent || capturing || enrolling || allCaptured
-                ? null
-                : _captureStep,
-            icon: capturing
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.camera_front),
-            label: Text(
-              capturing
-                  ? 'Mengambil...'
-                  : enrolling || allCaptured
-                  ? 'Menyimpan...'
-                  : 'Ambil sampel ${stepIndex + 1}/${_steps.length}',
-            ),
+          Text(
+            consent
+                ? 'Foto diambil otomatis saat wajah dan gerakan terdeteksi.'
+                : 'Pengambilan foto otomatis dimulai setelah Anda menyetujui.',
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
           ),
-          if (stepIndex > 0 && !enrolling && !capturing)
+          if (!_busy && error != null && _capturedCount == 0) ...[
+            const SizedBox(height: 8),
+            FilledButton.icon(
+              onPressed: _retry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Coba lagi'),
+            ),
+          ],
+          if (!_busy && _capturedCount > 0)
             TextButton(
-              onPressed: _reset,
+              onPressed: _retry,
               child: const Text(
                 'Ulangi dari awal',
                 style: TextStyle(color: Colors.white70),
               ),
             ),
-          if (alreadyEnrolled && !enrolling && stepIndex == 0)
+          if (alreadyEnrolled && !_busy && _capturedCount == 0)
             TextButton(
               onPressed: _delete,
               child: const Text(
