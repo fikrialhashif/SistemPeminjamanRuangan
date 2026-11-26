@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../theme/app_theme.dart';
+import 'siboru_mark.dart';
 
 class AppLogoMark extends StatelessWidget {
   const AppLogoMark({this.size = 44, super.key});
@@ -10,39 +11,15 @@ class AppLogoMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: size,
-      height: size,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            width: size,
-            height: size,
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(size * 0.24),
-            ),
-            child: Icon(
-              Icons.business_center_rounded,
-              color: Colors.white,
-              size: size * 0.46,
-            ),
-          ),
-          Positioned(
-            top: -2,
-            right: -2,
-            child: Container(
-              width: size * 0.24,
-              height: size * 0.24,
-              decoration: BoxDecoration(
-                color: AppColors.accent,
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.mint, width: 2),
-              ),
-            ),
-          ),
-        ],
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: BorderRadius.circular(size * 0.22),
+      ),
+      // The same crop as the launcher icon.
+      child: SiboruMark(
+        size: size,
+        viewport: const Rect.fromLTWH(16, 16, 76, 76),
       ),
     );
   }
@@ -126,10 +103,7 @@ class AppBrandHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'RESERVE & ASSET',
-                  style: Theme.of(context).textTheme.labelSmall,
-                ),
+                Text('SIBORU', style: Theme.of(context).textTheme.labelSmall),
                 const SizedBox(height: 2),
                 Text(
                   section,
@@ -156,7 +130,7 @@ class AppBrandHeader extends StatelessWidget {
 class AppDetailHeader extends StatelessWidget {
   const AppDetailHeader({
     required this.title,
-    this.eyebrow = 'RESERVE & ASSET',
+    this.eyebrow = 'SIBORU',
     this.onBack,
     this.onAvatarTap,
     super.key,

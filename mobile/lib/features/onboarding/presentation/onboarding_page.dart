@@ -15,7 +15,7 @@ class OnboardingPage extends ConsumerStatefulWidget {
 class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   static const _steps = [
     _OnboardingStep(
-      eyebrow: 'RESERVE & ASSET',
+      eyebrow: 'PEMESANAN',
       title: 'Pesan ruangan dan aset dengan mudah',
       description: 'Temukan ketersediaan ruangan, ajukan booking, dan kelola peminjaman aset dalam satu aplikasi.',
       icon: Icons.meeting_room_rounded,
@@ -62,12 +62,12 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'RESERVE & ASSET',
+                          'SISTEM PEMINJAMAN RUANGAN',
                           style: Theme.of(context).textTheme.labelSmall,
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'Smart Room Booking',
+                          'Siboru',
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
                       ],

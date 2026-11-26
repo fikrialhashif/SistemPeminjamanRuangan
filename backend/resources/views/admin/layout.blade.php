@@ -39,7 +39,7 @@
                     </svg>
                     <span>Ringkasan</span>
                 </a>
-                @if(auth()->user()->hasPermission('approvals.view'))
+                @if(auth()->user()->canAccessApprovals())
                     <a href="{{ route('admin.approvals') }}" class="nav-link" @if(request()->routeIs('admin.approvals')) aria-current="page" @endif>
                         <svg class="nav-glyph" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M7 3.5h6"></path>

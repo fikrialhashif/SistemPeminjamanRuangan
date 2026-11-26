@@ -73,7 +73,7 @@
                                     @endif
                                 </td>
                                 <td data-label="Keputusan" class="data-actions">
-                                    @if($canDecide)
+                                    @if($decidableIds->contains($approval->id))
                                         <form method="POST" action="{{ route('admin.approvals.approve', $approval) }}" class="decide">
                                             @csrf
                                             <input type="text" name="notes" class="input" placeholder="Catatan (boleh kosong)" aria-label="Catatan untuk permintaan {{ $approval->booking->title ?? '#'.$approval->booking_id }}">

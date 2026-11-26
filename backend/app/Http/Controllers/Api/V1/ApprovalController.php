@@ -9,6 +9,7 @@ use App\Models\Approval;
 use App\Services\ApprovalService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class ApprovalController extends Controller
 {
@@ -18,11 +19,12 @@ class ApprovalController extends Controller
 
     public function pending(Request $request): JsonResponse
     {
-        if ($forbidden = $this->forbiddenResponse($request, Permission::APPROVALS_VIEW)) {
-            return $forbidden;
+        if (! $request->user()->hasPermission(Permission::APPROVALS_VIEW)) {
+            return response()->json(['message' => 'Forbidden.'], 403);
         }
 
         $approvals = Approval::actionable()
+            ->withinAuthorityOf($request->user(), Permission::APPROVALS_VIEW)
             ->with(['booking.resource', 'booking.user'])
             ->orderBy('expires_at')
             ->paginate($request->input('per_page', 15));
@@ -32,9 +34,7 @@ class ApprovalController extends Controller
 
     public function approve(ApprovalDecisionRequest $request, Approval $approval): JsonResponse
     {
-        if ($forbidden = $this->forbiddenResponse($request, Permission::APPROVALS_UPDATE)) {
-            return $forbidden;
-        }
+        Gate::authorize('decide', $approval);
 
         $this->approvalService->approve($approval, $request->user(), $request->input('notes'));
 
@@ -43,21 +43,10 @@ class ApprovalController extends Controller
 
     public function reject(ApprovalDecisionRequest $request, Approval $approval): JsonResponse
     {
-        if ($forbidden = $this->forbiddenResponse($request, Permission::APPROVALS_UPDATE)) {
-            return $forbidden;
-        }
+        Gate::authorize('decide', $approval);
 
         $this->approvalService->reject($approval, $request->user(), $request->input('notes'));
 
         return response()->json(['message' => 'Rejected.']);
-    }
-
-    private function forbiddenResponse(Request $request, Permission $permission): ?JsonResponse
-    {
-        if ($request->user()->hasPermission($permission)) {
-            return null;
-        }
-
-        return response()->json(['message' => 'Forbidden.'], 403);
     }
 }

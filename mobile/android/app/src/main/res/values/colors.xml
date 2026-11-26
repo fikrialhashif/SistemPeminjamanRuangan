@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Same values as AppColors.primary and AppColors.accent. -->
+    <color name="siboru_green">#0F5132</color>
+    <color name="siboru_amber">#F4C95D</color>
+</resources>

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\Role as RoleEnum;
+use App\Jobs\CompleteFinishedBookings;
 use App\Models\AssetLoan;
 use App\Models\Booking;
 use App\Models\CheckInAttempt;
@@ -148,6 +149,56 @@ class CheckInRulesTest extends TestCase
             ->assertStatus(422)
             ->assertJsonPath('reason', 'face')
             ->assertJsonPath('message', 'Layanan wajah tidak tersedia. Gunakan override manual.');
+    }
+
+    public function test_asset_check_in_accepts_the_label_on_that_asset(): void
+    {
+        Setting::set('face_verification_enabled', false, 'boolean');
+        $booking = $this->booking($this->asset('CAM-001'), User::factory()->create());
+        $label = app(QrTokenService::class)->generateForAsset($booking->resource->asset)['token'];
+
+        $this->checkIn($booking, ['qr_token' => $label])
+            ->assertOk()
+            ->assertJsonPath('result', 'accepted');
+    }
+
+    #[TestWith(['other asset label'])]
+    #[TestWith(['door qr'])]
+    public function test_asset_check_in_rejects_any_other_qr(string $scanned): void
+    {
+        Setting::set('face_verification_enabled', false, 'boolean');
+        $booking = $this->booking($this->asset('CAM-001'), User::factory()->create());
+        $tokens = app(QrTokenService::class);
+        $token = $scanned === 'door qr'
+            ? $tokens->generate($booking->resource_id)['token']
+            : $tokens->generateForAsset($this->asset('CAM-002')->asset)['token'];
+
+        $this->checkIn($booking, ['qr_token' => $token])
+            ->assertOk()
+            ->assertJsonPath('result', 'rejected')
+            ->assertJsonPath('rejection_reasons.0', 'qr: Asset mismatch');
+    }
+
+    public function test_completing_a_checked_in_asset_booking_closes_a_loan_never_collected(): void
+    {
+        $resource = $this->asset('CAM-001');
+        $booking = $this->booking($resource, User::factory()->create());
+        $loan = AssetLoan::create(['booking_id' => $booking->id, 'asset_id' => $resource->asset->id, 'user_id' => $booking->user_id, 'status' => 'reserved']);
+        $booking->update(['status' => 'checked_in']);
+        $this->travel(2)->hours();
+
+        app()->call([new CompleteFinishedBookings, 'handle']);
+
+        $this->assertSame('completed', $booking->fresh()->status->value);
+        $this->assertSame('closed', $loan->fresh()->status->value);
+    }
+
+    private function asset(string $code): Resource
+    {
+        $resource = Resource::create(['name' => "Kamera {$code}", 'type' => 'asset', 'location_id' => $this->location()->id, 'is_active' => true]);
+        $resource->asset()->create(['code' => $code]);
+
+        return $resource;
     }
 
     /**

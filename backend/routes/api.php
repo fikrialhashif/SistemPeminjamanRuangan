@@ -29,6 +29,7 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('bookings', BookingController::class)->only(['index', 'store', 'show', 'destroy']);
         Route::post('bookings/recurring', [BookingController::class, 'recurring']);
         Route::post('bookings/bundled', [BookingController::class, 'bundled']);
+        Route::post('bookings/{booking}/location-check', [BookingController::class, 'checkLocation'])->middleware('throttle:30,1');
         Route::post('bookings/{booking}/check-in', [BookingController::class, 'checkIn']);
         Route::post('bookings/{booking}/waitlist', [BookingController::class, 'waitlist']);
         Route::post('waitlist/{waitlistEntry}/claim', [BookingController::class, 'claimWaitlist']);

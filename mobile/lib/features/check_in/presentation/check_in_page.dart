@@ -37,6 +37,9 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
 
   int step = 0;
   LocationEvidence? location;
+
+  /// The server's answer for [location]; null until it has been asked.
+  Map<String, dynamic>? locationCheck;
   String? qrToken;
   bool locationLoading = false;
   bool faceStatusLoading = false;
@@ -99,7 +102,7 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
             duration: const Duration(milliseconds: 200),
             child: switch (step) {
               0 => _locationStep(roomLocation),
-              1 => _qrStep(),
+              1 => _qrStep(isAsset: _isAsset(booking)),
               2 => _faceStep(),
               _ => _timeStep(booking),
             },
@@ -111,6 +114,11 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
         ],
       ),
     );
+  }
+
+  bool _isAsset(Map<String, dynamic>? booking) {
+    final resource = booking?['resource'];
+    return resource is Map && resource['type'] == 'asset';
   }
 
   Map<String, dynamic>? _roomLocation(Map<String, dynamic>? booking) {
@@ -221,6 +229,16 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
               label: const Text('Buka pengaturan'),
             ),
           ],
+          if (locationCheck != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: locationCheck!['valid'] == true
+                  ? _InfoBanner(
+                      icon: Icons.check_circle_outline,
+                      message: locationCheckMessage(locationCheck!),
+                    )
+                  : _InlineError(message: locationCheckMessage(locationCheck!)),
+            ),
           if (locationError != null)
             Padding(
               padding: const EdgeInsets.only(top: 12),
@@ -248,12 +266,14 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
     );
   }
 
-  Widget _qrStep() {
+  Widget _qrStep({required bool isAsset}) {
     return _StepCard(
       key: const ValueKey('qr-step'),
       icon: Icons.qr_code_scanner,
-      title: 'Langkah 2 - QR ruangan',
-      description: 'Pindai QR yang ditampilkan di dalam ruangan. Token QR berumur pendek dan hanya berlaku untuk booking ini.',
+      title: isAsset ? 'Langkah 2 - QR aset' : 'Langkah 2 - QR ruangan',
+      description: isAsset
+          ? 'Pindai label QR yang ditempel pada aset yang Anda pinjam.'
+          : 'Pindai QR yang ditempel di ruangan yang Anda booking.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -426,7 +446,7 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
 
   Widget _navigation() {
     final canContinue = switch (step) {
-      0 => location != null,
+      0 => locationCheck?['valid'] == true,
       1 => qrToken != null,
       2 =>
         faceStatusReady &&
@@ -526,6 +546,7 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
       locationLoading = true;
       locationError = null;
       location = null;
+      locationCheck = null;
     });
     try {
       final service = ref.read(locationServiceProvider);
@@ -545,6 +566,11 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
       final evidence = await service.currentEvidence();
       if (!mounted) return;
       setState(() => location = evidence);
+      final check = await ref
+          .read(checkInRepositoryProvider)
+          .checkLocation(bookingId: widget.bookingId, location: evidence);
+      if (!mounted) return;
+      setState(() => locationCheck = check);
     } catch (error) {
       if (!mounted) return;
       setState(() => locationError = apiErrorMessage(error));
@@ -875,12 +901,19 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
     final challengeType = challenge?['challenge_type']?.toString();
     var retryFace = false;
     try {
+      // The server rejects readings older than a few seconds, and the steps
+      // since the first one take longer than that, so take a new reading.
+      final evidence = await ref
+          .read(locationServiceProvider)
+          .currentEvidence();
+      if (!mounted) return;
+      location = evidence;
       final result = await ref
           .read(checkInRepositoryProvider)
           .checkIn(
             bookingId: widget.bookingId,
             qrToken: qrToken!,
-            location: location!,
+            location: evidence,
             faceImageBase64: faceFrame == null
                 ? null
                 : base64Encode(faceFrame!),

@@ -13,6 +13,22 @@ class CheckInRepository {
   CheckInRepository(this._dio);
   final Dio _dio;
 
+  /// Asks the server whether this reading is inside the room's area.
+  Future<Map<String, dynamic>> checkLocation({
+    required String bookingId,
+    required LocationEvidence location,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '/bookings/$bookingId/location-check',
+        data: location.toJson(),
+      );
+      return Map<String, dynamic>.from(response.data as Map);
+    } catch (error) {
+      throw mapDioError(error);
+    }
+  }
+
   Future<Map<String, dynamic>> checkIn({
     required String bookingId,
     required String qrToken,
@@ -58,6 +74,21 @@ String checkInReasonMessage(String? code) =>
     }[code] ??
     'Check-in ditolak. Ikuti petunjuk lalu coba lagi.';
 
+/// Explains the server's answer to a location check; display only.
+String locationCheckMessage(Map<String, dynamic> check) {
+  if (check['valid'] == true) return 'Lokasi Anda berada di area ruangan.';
+  final reasons = checkInDecisionMessage({
+    'result': 'rejected',
+    'rejection_reasons': check['rejection_reasons'],
+  });
+  final distance = check['distance_meters'];
+  final radius = check['radius_meters'];
+  if (distance is num && radius is num && distance > radius) {
+    return '$reasons\nJarak Anda $distance m, batas $radius m.';
+  }
+  return reasons;
+}
+
 bool isFaceIdentityMismatch(Map<String, dynamic> result) {
   final reasons = result['rejection_reasons'];
   if (reasons is! List) return false;
@@ -94,10 +125,13 @@ String _reasonFromServer(String reason) {
     return 'Waktu check-in di luar rentang yang diizinkan.';
   }
   if (value.contains('qr:') || value.contains('token')) {
+    if (value.contains('asset mismatch')) {
+      return 'QR ini bukan label aset yang Anda pinjam.';
+    }
     if (value.contains('mismatch')) {
       return 'QR bukan untuk ruangan booking ini.';
     }
-    return 'QR tidak valid. Pastikan QR pintu sesuai booking.';
+    return 'QR tidak valid. Pastikan QR sesuai booking.';
   }
   if (value.contains('mock')) {
     return 'Lokasi tiruan terdeteksi. Matikan aplikasi mock-location.';

@@ -25,6 +25,43 @@ class CheckInDecisionService
         protected VerificationTimePolicy $verificationTimePolicy,
     ) {}
 
+    /**
+     * Tells the app whether a reading is inside the room's area before the other check-in steps.
+     * Nothing is recorded: process() repeats the check and remains the decision that counts.
+     *
+     * @param  array<string, mixed>  $evidence
+     * @return array{valid: bool, rejection_reasons: list<string>, distance_meters: int|null, radius_meters: int|null}
+     */
+    public function checkLocation(Booking $booking, User $user, array $evidence): array
+    {
+        $this->validateOwnership($booking, $user);
+        $this->validateLocationConfigured($booking);
+
+        $location = $booking->resource->location;
+        $result = $this->gpsValidator->validate(
+            $location,
+            (float) $evidence['gps_latitude'],
+            (float) $evidence['gps_longitude'],
+            (float) $evidence['gps_accuracy'],
+            $evidence['gps_timestamp'],
+            (bool) $evidence['gps_is_mock'],
+            $user->id,
+        );
+
+        $distance = $this->gpsValidator->distanceFromCircle(
+            $location,
+            (float) $evidence['gps_latitude'],
+            (float) $evidence['gps_longitude'],
+        );
+
+        return [
+            'valid' => $result['valid'],
+            'rejection_reasons' => array_map(fn (string $reason): string => 'gps: '.$reason, $result['reasons']),
+            'distance_meters' => $distance === null ? null : (int) round($distance),
+            'radius_meters' => $distance === null ? null : $location->radius,
+        ];
+    }
+
     public function process(Booking $booking, User $user, array $evidence): CheckInAttempt
     {
         $this->validateOwnership($booking, $user);
@@ -37,11 +74,10 @@ class CheckInDecisionService
             $rejectionReasons[] = 'time: '.$timeOutcome->reason;
         }
 
-        $qrResult = $this->qrTokenService->validate(
-            $evidence['qr_token'],
-            $booking->resource_id,
-            $booking->id,
-        );
+        // A room door carries the room's QR; an asset carries its own printed label.
+        $qrResult = $booking->resource->type === ResourceType::ASSET
+            ? $this->qrTokenService->validateForAsset($evidence['qr_token'], (string) $booking->resource->asset?->code)
+            : $this->qrTokenService->validate($evidence['qr_token'], $booking->resource_id, $booking->id);
         $qrValid = $qrResult['valid'];
         if (! $qrValid) {
             $rejectionReasons[] = 'qr: '.$qrResult['reason'];

@@ -112,7 +112,8 @@ class _BookingDetailBody extends StatelessWidget {
             context,
             colorScheme,
             icon: Icons.schedule,
-            title: 'Menunggu persetujuan approver',
+            // Approvers' own bookings are decided by a resource manager.
+            title: 'Menunggu persetujuan',
             description: 'Check-in tersedia setelah booking ini disetujui.',
           ),
           const SizedBox(height: 14),
@@ -189,7 +190,10 @@ class _BookingDetailBody extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              _ProofRow(label: 'QR ruangan', valid: latest['qr_valid'] == true),
+              _ProofRow(
+                label: resource?['type'] == 'asset' ? 'QR aset' : 'QR ruangan',
+                valid: latest['qr_valid'] == true,
+              ),
               _ProofRow(
                 label: 'Lokasi',
                 valid: latest['gps_valid'] == true,

@@ -37,12 +37,13 @@ class GpsValidator
             $reasons[] = 'GPS reading is stale';
         }
 
-        if ($location->polygon && is_array($location->polygon) && count($location->polygon) >= 3) {
+        $distance = $this->distanceFromCircle($location, $lat, $lng);
+
+        if ($this->usesPolygon($location)) {
             if (! $this->pointInPolygon($lat, $lng, $location->polygon)) {
                 $reasons[] = 'Outside geofence polygon';
             }
-        } elseif ($location->latitude && $location->longitude) {
-            $distance = $this->haversineDistance($lat, $lng, (float) $location->latitude, (float) $location->longitude);
+        } elseif ($distance !== null) {
             $radius = $location->radius ?? 100;
             if ($distance > $radius) {
                 $reasons[] = "Distance {$distance}m exceeds geofence radius of {$radius}m";
@@ -60,6 +61,23 @@ class GpsValidator
             'valid' => empty($reasons),
             'reasons' => $reasons,
         ];
+    }
+
+    /**
+     * Metres from the centre of a circular area; null when the area is a polygon or has no centre.
+     */
+    public function distanceFromCircle(Location $location, float $lat, float $lng): ?float
+    {
+        if ($this->usesPolygon($location) || ! $location->latitude || ! $location->longitude) {
+            return null;
+        }
+
+        return $this->haversineDistance($lat, $lng, (float) $location->latitude, (float) $location->longitude);
+    }
+
+    private function usesPolygon(Location $location): bool
+    {
+        return is_array($location->polygon) && count($location->polygon) >= 3;
     }
 
     public function haversineDistance(float $lat1, float $lng1, float $lat2, float $lng2): float

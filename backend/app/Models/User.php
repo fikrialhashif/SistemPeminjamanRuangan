@@ -104,6 +104,19 @@ class User extends Authenticatable
         });
     }
 
+    /**
+     * Whether this user decides the bookings that approvers request for themselves.
+     */
+    public function reviewsApproverRequests(): bool
+    {
+        return $this->isAdmin() || $this->hasRole(\App\Enums\Role::RESOURCE_MANAGER->value);
+    }
+
+    public function canAccessApprovals(): bool
+    {
+        return $this->hasPermission(Permission::APPROVALS_VIEW) || $this->reviewsApproverRequests();
+    }
+
     public function isSuspended(): bool
     {
         return $this->suspensions()

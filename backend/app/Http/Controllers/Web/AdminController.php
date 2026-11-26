@@ -24,6 +24,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -92,10 +93,13 @@ class AdminController extends Controller
 
         return view('admin.dashboard', [
             'totalBookings' => Booking::count(),
-            'pendingApprovals' => Approval::awaitingDecision()->count(),
+            'pendingApprovals' => Approval::awaitingDecision()
+                ->withinAuthorityOf($request->user(), Permission::APPROVALS_VIEW, onWebPanel: true)
+                ->count(),
             'activeResources' => Resource::where('is_active', true)->count(),
             'totalStrikes' => Strike::count(),
             'recentApprovals' => Approval::awaitingDecision()
+                ->withinAuthorityOf($request->user(), Permission::APPROVALS_VIEW, onWebPanel: true)
                 ->with(['booking.user', 'booking.resource'])
                 ->latest()
                 ->limit(4)
@@ -143,7 +147,7 @@ class AdminController extends Controller
         if ($user->hasPermission(Permission::APPROVALS_VIEW)) {
             $charts[] = $this->monthlyApprovalTrend($periods['approval_trend']);
             $charts[] = $this->approvalDecisionChart($periods['approval_decisions']);
-            $charts[] = $this->pendingApprovalsByRoomChart($periods['approval_queue']);
+            $charts[] = $this->pendingApprovalsByRoomChart($user, $periods['approval_queue']);
         }
 
         if ($user->hasPermission(Permission::BOOKINGS_VIEW) || $user->hasPermission(Permission::RESOURCES_VIEW)) {
@@ -252,9 +256,10 @@ class AdminController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function pendingApprovalsByRoomChart(int $months): array
+    private function pendingApprovalsByRoomChart(User $user, int $months): array
     {
         $approvals = Approval::actionable()
+            ->withinAuthorityOf($user, Permission::APPROVALS_VIEW, onWebPanel: true)
             ->where('approvals.created_at', '>=', $this->dashboardPeriodStart($months))
             ->with('booking.resource')
             ->get();
@@ -441,21 +446,27 @@ class AdminController extends Controller
 
     public function approvals(Request $request)
     {
-        $this->ensurePermission(Permission::APPROVALS_VIEW);
+        $user = $request->user();
 
-        $canDecide = $request->user()->hasPermission(Permission::APPROVALS_UPDATE);
+        abort_unless($user->canAccessApprovals(), 403, 'Anda tidak punya izin untuk melakukan aksi ini.');
 
         $approvals = Approval::actionable()
+            ->withinAuthorityOf($user, Permission::APPROVALS_VIEW, onWebPanel: true)
             ->with(['booking.user', 'booking.resource'])
             ->latest()
             ->paginate(20);
 
-        return view('admin.approvals', compact('approvals', 'canDecide'));
+        $decidableIds = Approval::query()
+            ->whereKey($approvals->pluck('id'))
+            ->withinAuthorityOf($user, Permission::APPROVALS_UPDATE, onWebPanel: true)
+            ->pluck('id');
+
+        return view('admin.approvals', compact('approvals', 'decidableIds'));
     }
 
     public function approve(Request $request, Approval $approval, ApprovalService $approvalService)
     {
-        $this->ensurePermission(Permission::APPROVALS_UPDATE);
+        Gate::authorize('decide', [$approval, true]);
 
         try {
             $approvalService->approve($approval, $request->user(), $request->input('notes'));
@@ -468,7 +479,7 @@ class AdminController extends Controller
 
     public function reject(Request $request, Approval $approval, ApprovalService $approvalService)
     {
-        $this->ensurePermission(Permission::APPROVALS_UPDATE);
+        Gate::authorize('decide', [$approval, true]);
 
         try {
             $approvalService->reject($approval, $request->user(), $request->input('notes'));

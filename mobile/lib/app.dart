@@ -152,7 +152,7 @@ class _BookingAppState extends ConsumerState<BookingApp> {
       _router.go('/');
     });
     return MaterialApp.router(
-      title: 'Smart Room Booking',
+      title: 'Siboru',
       theme: AppTheme.light,
       routerConfig: _router,
     );

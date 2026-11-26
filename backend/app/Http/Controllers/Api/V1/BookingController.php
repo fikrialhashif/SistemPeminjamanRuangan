@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Exceptions\ConflictException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CheckInRequest;
+use App\Http\Requests\CheckLocationRequest;
 use App\Http\Requests\StoreBookingRequest;
 use App\Http\Requests\StoreBundledBookingRequest;
 use App\Http\Requests\StoreRecurringBookingRequest;
@@ -67,6 +68,15 @@ class BookingController extends Controller
         $this->bookingService->cancel($request->user(), $booking);
 
         return response()->json(['message' => 'Booking cancelled.']);
+    }
+
+    public function checkLocation(CheckLocationRequest $request, Booking $booking): JsonResponse
+    {
+        return response()->json($this->checkInDecisionService->checkLocation(
+            $booking,
+            $request->user(),
+            $request->validated(),
+        ));
     }
 
     public function checkIn(CheckInRequest $request, Booking $booking): JsonResponse

@@ -105,7 +105,7 @@ class _BookingFormPageState extends ConsumerState<BookingFormPage> {
         child: Column(
           children: [
             AppDetailHeader(
-              eyebrow: 'RESERVE & ASSET',
+              eyebrow: 'SIBORU',
               title: 'Buat booking',
               onBack: () {
                 if (context.canPop()) {

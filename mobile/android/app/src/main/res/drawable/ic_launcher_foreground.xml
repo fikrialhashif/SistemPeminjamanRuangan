@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Siboru mark: a door with a location pin. Used by the adaptive icon and
+     the Android 12+ splash screen. Mirrors SiboruMarkPainter in Flutter. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Door -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M32,76 L32,45 A15,15 0 0 1 62,45 L62,76 Z" />
+    <!-- Door knob -->
+    <path
+        android:fillColor="@color/siboru_green"
+        android:pathData="M36.1,58 a2.4,2.4 0 1 0 4.8,0 a2.4,2.4 0 1 0 -4.8,0 Z" />
+    <!-- Margin between pin and door -->
+    <path
+        android:fillColor="@color/siboru_green"
+        android:pathData="M66,86.58 L53.85,67.91 A14.5,14.5 0 1 1 78.15,67.91 Z" />
+    <!-- Pin -->
+    <path
+        android:fillColor="@color/siboru_amber"
+        android:pathData="M66,82 L55.94,66.55 A12,12 0 1 1 76.06,66.55 Z" />
+    <path
+        android:fillColor="@color/siboru_green"
+        android:pathData="M61.4,60 a4.6,4.6 0 1 0 9.2,0 a4.6,4.6 0 1 0 -9.2,0 Z" />
+</vector>

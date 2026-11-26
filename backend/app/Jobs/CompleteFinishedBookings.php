@@ -23,6 +23,10 @@ class CompleteFinishedBookings implements ShouldQueue
         Booking::where('status', BookingStatus::CHECKED_IN)
             ->where('ends_at', '<=', now())
             ->whereDoesntHave('assetLoan', fn ($query) => $query->whereIn('status', [LoanStatus::HANDED_OVER, LoanStatus::IN_USE]))
-            ->eachById(fn (Booking $booking) => $booking->update(['status' => BookingStatus::COMPLETED]));
+            ->eachById(function (Booking $booking): void {
+                $booking->update(['status' => BookingStatus::COMPLETED]);
+                // Checked in but never collected: it can no longer be handed over.
+                $booking->assetLoan()->where('status', LoanStatus::RESERVED)->first()?->update(['status' => LoanStatus::CLOSED]);
+            });
     }
 }

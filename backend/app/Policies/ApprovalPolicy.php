@@ -2,19 +2,17 @@
 
 namespace App\Policies;
 
-use App\Enums\Role;
+use App\Enums\Permission;
 use App\Models\Approval;
 use App\Models\User;
 
 class ApprovalPolicy
 {
-    public function viewPending(User $user): bool
+    public function decide(User $user, Approval $approval, bool $onWebPanel = false): bool
     {
-        return $user->isAdmin() || $user->hasRole(Role::APPROVER->value);
-    }
-
-    public function decide(User $user, Approval $approval): bool
-    {
-        return $user->id === $approval->approver_id;
+        return Approval::query()
+            ->whereKey($approval->id)
+            ->withinAuthorityOf($user, Permission::APPROVALS_UPDATE, $onWebPanel)
+            ->exists();
     }
 }
