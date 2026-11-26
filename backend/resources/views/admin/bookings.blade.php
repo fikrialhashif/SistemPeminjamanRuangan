@@ -17,8 +17,8 @@
         </div>
         <div class="plate-aside">
             <div class="plate-date">
-                <span class="plate-date-day">{{ now()->locale('id')->isoFormat('dddd') }}</span>
-                <span class="plate-date-full">{{ now()->locale('id')->isoFormat('D MMMM Y') }}</span>
+                <span class="plate-date-day">{{ now()->wib()->locale('id')->isoFormat('dddd') }}</span>
+                <span class="plate-date-full">{{ now()->wib()->locale('id')->isoFormat('D MMMM Y') }}</span>
             </div>
         </div>
     </header>
@@ -90,8 +90,8 @@
                                     </td>
                                     <td data-label="Waktu">
                                         <div class="cell-time">
-                                            {{ $booking->starts_at->format('H:i') }}–{{ $booking->ends_at->format('H:i') }}
-                                            <span class="cell-time-sub">berakhir {{ $booking->ends_at->locale('id')->diffForHumans($now, ['short' => true, 'parts' => 1]) }}</span>
+                                            {{ $booking->starts_at->wib()->format('H:i') }}–{{ $booking->ends_at->wib()->format('H:i') }}
+                                            <span class="cell-time-sub">berakhir {{ $booking->ends_at->wib()->locale('id')->diffForHumans($now, ['short' => true, 'parts' => 1]) }}</span>
                                         </div>
                                     </td>
                                     <td data-label="Status">
@@ -159,8 +159,8 @@
                                     <td data-label="Jatuh tempo">
                                         @if($loan->due_at)
                                             <div class="cell-time {{ $isOverdue ? 'overdue' : '' }}">
-                                                {{ $loan->due_at->format('H:i') }}
-                                                <span class="cell-time-sub">{{ $loan->due_at->locale('id')->isoFormat('D MMM') }}</span>
+                                                {{ $loan->due_at->wib()->format('H:i') }}
+                                                <span class="cell-time-sub">{{ $loan->due_at->wib()->locale('id')->isoFormat('D MMM') }}</span>
                                             </div>
                                         @else
                                             <span class="cell-muted">&mdash;</span>
@@ -224,7 +224,7 @@
                                 <td data-label="Mulai">
                                     @if($entry['starts_at'])
                                         <div class="cell-time">
-                                            {{ $entry['starts_at']->format('H:i') }}
+                                            {{ $entry['starts_at']->wib()->format('H:i') }}
                                             <span class="cell-time-sub">{{ $entry['starts_at']->locale('id')->diffForHumans($now, ['short' => true, 'parts' => 1]) }}</span>
                                         </div>
                                     @else
@@ -232,7 +232,7 @@
                                     @endif
                                 </td>
                                 <td data-label="Selesai">
-                                    {{ $entry['ends_at'] ? $entry['ends_at']->format('H:i') : '—' }}
+                                    {{ $entry['ends_at'] ? $entry['ends_at']->wib()->format('H:i') : '—' }}
                                 </td>
                                 <td data-label="Status">
                                     <span class="tag {{ $entry['status_tone'] }}">{{ $entry['status'] }}</span>

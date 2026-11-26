@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\BookingStatus;
 use App\Enums\CheckInResult;
+use App\Enums\Role;
 use App\Models\Approval;
 use App\Models\Asset;
 use App\Models\Booking;
@@ -11,10 +12,12 @@ use App\Models\CheckInAttempt;
 use App\Models\FaceEnrollment;
 use App\Models\Location;
 use App\Models\Resource;
+use App\Models\Role as RoleModel;
 use App\Models\Setting;
 use App\Models\User;
 use App\Services\ApprovalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\TestWith;
 use Tests\TestCase;
 
 class BookingApprovalAndDetailTest extends TestCase
@@ -107,6 +110,66 @@ class BookingApprovalAndDetailTest extends TestCase
             ->assertJsonPath('resource.location.name', 'Gedung Utama')
             ->assertJsonPath('check_in_attempts.0.result', 'accepted')
             ->assertJsonPath('check_in_attempts.0.qr_valid', true);
+    }
+
+    public function test_detail_returns_403_for_another_members_booking(): void
+    {
+        [$owner, $room] = $this->userWithEnrolledFaceAndRoom();
+        $booking = $this->createBooking($owner, $room);
+
+        $this->actingAs(User::factory()->create())
+            ->getJson("/api/v1/bookings/{$booking->id}")
+            ->assertForbidden();
+    }
+
+    public function test_admin_can_view_another_users_booking(): void
+    {
+        [$owner, $room] = $this->userWithEnrolledFaceAndRoom();
+        $booking = $this->createBooking($owner, $room);
+
+        $this->actingAs($this->userWithRole(Role::ADMIN))
+            ->getJson("/api/v1/bookings/{$booking->id}")
+            ->assertOk()
+            ->assertJsonPath('id', $booking->id);
+    }
+
+    #[TestWith(['approve', BookingStatus::CANCELLED])]
+    #[TestWith(['reject', BookingStatus::CANCELLED])]
+    #[TestWith(['approve', BookingStatus::EXPIRED])]
+    public function test_decision_returns_422_when_booking_is_no_longer_pending(string $decision, BookingStatus $status): void
+    {
+        [$owner, $room] = $this->userWithEnrolledFaceAndRoom();
+        $booking = $this->createBooking($owner, $room);
+        $booking->update(['status' => $status]);
+        $approval = $booking->approvals()->firstOrFail();
+
+        $this->actingAs($this->userWithRole(Role::APPROVER))
+            ->postJson("/api/v1/approvals/{$approval->id}/{$decision}")
+            ->assertStatus(422)
+            ->assertJsonPath('errors.approval.0', 'Pemesanan ini sudah tidak menunggu persetujuan.');
+
+        $this->assertSame($status, $booking->fresh()->status);
+        $this->assertSame('pending', $approval->fresh()->status);
+    }
+
+    public function test_pending_list_omits_approvals_of_cancelled_bookings(): void
+    {
+        [$owner, $room] = $this->userWithEnrolledFaceAndRoom();
+        $booking = $this->createBooking($owner, $room);
+        $this->actingAs($owner)->deleteJson("/api/v1/bookings/{$booking->id}")->assertOk();
+
+        $this->actingAs($this->userWithRole(Role::APPROVER))
+            ->getJson('/api/v1/approvals/pending')
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+    }
+
+    private function userWithRole(Role $role): User
+    {
+        $user = User::factory()->create();
+        $user->roles()->attach(RoleModel::firstOrCreate(['name' => $role]));
+
+        return $user;
     }
 
     /**

@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Exceptions\ConflictException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CheckInRequest;
 use App\Http\Requests\StoreBookingRequest;
 use App\Http\Requests\StoreBundledBookingRequest;
 use App\Http\Requests\StoreRecurringBookingRequest;
+use App\Jobs\ProcessWaitlistOffer;
 use App\Models\Booking;
 use App\Models\BookingSeries;
 use App\Models\WaitlistEntry;
@@ -17,6 +19,8 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 
 class BookingController extends Controller
 {
@@ -53,6 +57,8 @@ class BookingController extends Controller
 
     public function show(Booking $booking): JsonResponse
     {
+        Gate::authorize('view', $booking);
+
         return response()->json($booking->load(['resource.location', 'user', 'approvals', 'checkInAttempts']));
     }
 
@@ -94,8 +100,8 @@ class BookingController extends Controller
     {
         $data = $request->validated();
         $interval = $data['interval_weeks'] ?? 1;
-        $start = Carbon::parse($data['starts_at']);
-        $end = Carbon::parse($data['ends_at']);
+        $start = Carbon::parse($data['starts_at'])->utc();
+        $end = Carbon::parse($data['ends_at'])->utc();
         $duration = $start->diffInSeconds($end);
         $series = DB::transaction(function () use ($request, $data, $start, $duration, $interval) {
             $series = BookingSeries::create([
@@ -105,21 +111,28 @@ class BookingController extends Controller
                 'conflict_policy' => $data['conflict_policy'],
                 'occurrences' => $data['occurrences'],
             ]);
-            $created = [];
+            $firstRefusal = null;
             for ($i = 0; $i < $data['occurrences']; $i++) {
                 $occurrenceStart = $start->copy()->addWeeks($i * $interval);
                 try {
-                    $created[] = $this->bookingService->create($request->user(), [
+                    $this->bookingService->create($request->user(), [
                         ...$data,
                         'starts_at' => $occurrenceStart->toDateTimeString(),
                         'ends_at' => $occurrenceStart->copy()->addSeconds($duration)->toDateTimeString(),
                         'booking_series_id' => $series->id,
                     ]);
-                } catch (\Throwable $error) {
+                } catch (ConflictException|ValidationException $error) {
                     if ($data['conflict_policy'] === 'reject') {
                         throw $error;
                     }
+
+                    $firstRefusal ??= $error;
                 }
+            }
+
+            // A series without a single booking is a failure, not a success.
+            if ($firstRefusal !== null && $series->bookings()->doesntExist()) {
+                throw $firstRefusal;
             }
 
             return $series->load('bookings');
@@ -133,9 +146,9 @@ class BookingController extends Controller
         if ($waitlistEntry->user_id !== $request->user()->id || $waitlistEntry->status !== 'offered' || $waitlistEntry->offer_expires_at?->isPast()) {
             return response()->json(['message' => 'Waitlist offer is not claimable.'], 422);
         }
-        $waitlistEntry->update(['status' => 'claimed', 'claimed_at' => now()]);
+        $this->bookingService->claimWaitlistOffer($request->user(), $waitlistEntry);
 
-        return response()->json($waitlistEntry);
+        return response()->json($waitlistEntry->refresh());
     }
 
     public function declineWaitlist(Request $request, WaitlistEntry $waitlistEntry): JsonResponse
@@ -144,6 +157,12 @@ class BookingController extends Controller
             return response()->json(['message' => 'Waitlist offer cannot be declined.'], 422);
         }
         $waitlistEntry->update(['status' => 'declined']);
+
+        ProcessWaitlistOffer::dispatch(
+            $waitlistEntry->resource_id,
+            $waitlistEntry->desired_start->toDateTimeString(),
+            $waitlistEntry->desired_end->toDateTimeString(),
+        );
 
         return response()->json($waitlistEntry);
     }

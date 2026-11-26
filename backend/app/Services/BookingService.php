@@ -12,6 +12,7 @@ use App\Models\Booking;
 use App\Models\Resource;
 use App\Models\Setting;
 use App\Models\User;
+use App\Models\WaitlistEntry;
 use Carbon\Carbon;
 use Illuminate\Database\DeadlockException;
 use Illuminate\Support\Facades\DB;
@@ -21,14 +22,19 @@ class BookingService
 {
     private const MAX_RETRIES = 3;
 
+    public function __construct(
+        protected OperatingHoursResolver $operatingHoursResolver,
+    ) {}
+
     public function create(User $user, array $data): Booking
     {
-        $resource = Resource::with(['rules', 'accessRules', 'location'])->findOrFail($data['resource_id']);
+        $resource = Resource::with(['rules', 'location'])->findOrFail($data['resource_id']);
 
         $this->validateResourceActive($resource);
         $this->validateUserAccess($user, $resource);
         $this->validateFaceEnrollment($user, $resource);
         $this->validateDuration($resource, $data);
+        $this->validateOperatingHours($resource, $data);
 
         $attempt = 0;
 
@@ -38,8 +44,9 @@ class BookingService
                 return DB::transaction(function () use ($user, $data, $resource) {
                     DB::table('resources')->where('id', $resource->id)->lockForUpdate()->first();
 
-                    $startsAt = Carbon::parse($data['starts_at']);
-                    $endsAt = Carbon::parse($data['ends_at']);
+                    // Stored times are UTC; an offset in the request must not shift them.
+                    $startsAt = Carbon::parse($data['starts_at'])->utc();
+                    $endsAt = Carbon::parse($data['ends_at'])->utc();
                     $buffer = $resource->rules?->buffer_minutes ?? 0;
 
                     $slotHoldingStatuses = collect(BookingStatus::cases())
@@ -100,7 +107,13 @@ class BookingService
             throw ValidationException::withMessages(['status' => 'Booking cannot be cancelled in its current state.']);
         }
 
-        $rules = $booking->resource->rules;
+        if (! $user->isAdmin() && $booking->starts_at->lte(now())) {
+            throw ValidationException::withMessages([
+                'deadline' => 'Pemesanan yang sudah dimulai tidak bisa dibatalkan.',
+            ]);
+        }
+
+        $rules = $booking->resource?->rules;
         $deadline = $rules?->cancellation_minutes_before;
 
         if ($deadline && ! $user->isAdmin() && $booking->starts_at->diffInMinutes(now(), false) > -$deadline) {
@@ -113,6 +126,33 @@ class BookingService
             'status' => BookingStatus::CANCELLED,
             'cancelled_at' => now(),
         ]);
+    }
+
+    /**
+     * Claims a waitlist offer by booking the offered slot.
+     */
+    public function claimWaitlistOffer(User $user, WaitlistEntry $entry): void
+    {
+        // A conditional update lets only one of two simultaneous claims go on to book.
+        $claimed = WaitlistEntry::whereKey($entry->id)
+            ->where('status', 'offered')
+            ->update(['status' => 'claimed', 'claimed_at' => now()]);
+
+        if (! $claimed) {
+            throw ValidationException::withMessages(['waitlist' => 'Waitlist offer is not claimable.']);
+        }
+
+        try {
+            $this->create($user, [
+                'resource_id' => $entry->resource_id,
+                'starts_at' => $entry->desired_start->toIso8601String(),
+                'ends_at' => $entry->desired_end->toIso8601String(),
+            ]);
+        } catch (\Throwable $error) {
+            WaitlistEntry::whereKey($entry->id)->update(['status' => 'offered', 'claimed_at' => null]);
+
+            throw $error;
+        }
     }
 
     private function validateResourceActive(Resource $resource): void
@@ -132,25 +172,7 @@ class BookingService
             throw ValidationException::withMessages(['user' => 'Your account is currently suspended.']);
         }
 
-        $accessRules = $resource->accessRules;
-
-        if ($accessRules->isEmpty()) {
-            return;
-        }
-
-        $userRoleIds = $user->roles()->pluck('roles.id');
-        $hasAccess = $accessRules->contains(function ($rule) use ($user, $userRoleIds) {
-            if ($rule->role_id && $userRoleIds->contains($rule->role_id)) {
-                return true;
-            }
-            if ($rule->department_id && $user->department_id === $rule->department_id) {
-                return true;
-            }
-
-            return false;
-        });
-
-        if (! $hasAccess) {
+        if (! $resource->isAccessibleBy($user)) {
             throw ValidationException::withMessages(['access' => 'You do not have access to this resource.']);
         }
     }
@@ -161,10 +183,7 @@ class BookingService
             return;
         }
 
-        if (! Setting::get('face_verification_enabled', false)) {
-            return;
-        }
-
+        // Room check-in always verifies the face, whatever the asset setting says.
         if ($user->faceEnrollment?->status !== 'enrolled') {
             throw new FaceEnrollmentRequiredException;
         }
@@ -204,6 +223,32 @@ class BookingService
 
         if ($startsAt->lt(now())) {
             throw ValidationException::withMessages(['starts_at' => 'Cannot book in the past.']);
+        }
+    }
+
+    /**
+     * Operating hours apply to rooms only: an asset loan may span several days.
+     */
+    private function validateOperatingHours(Resource $resource, array $data): void
+    {
+        if ($resource->type !== ResourceType::ROOM) {
+            return;
+        }
+
+        $startsAt = Carbon::parse($data['starts_at']);
+        $hours = $this->operatingHoursResolver->find($resource, $startsAt->copy()->setTimezone('Asia/Jakarta'));
+
+        if ($hours === null) {
+            return;
+        }
+
+        if ($startsAt->lt($hours->start) || Carbon::parse($data['ends_at'])->gt($hours->end)) {
+            $open = $hours->start->copy()->setTimezone('Asia/Jakarta')->format('H:i');
+            $close = $hours->end->copy()->setTimezone('Asia/Jakarta')->format('H:i');
+
+            throw ValidationException::withMessages([
+                'starts_at' => "Waktu pemesanan harus di dalam jam operasional ({$open}-{$close} WIB).",
+            ]);
         }
     }
 

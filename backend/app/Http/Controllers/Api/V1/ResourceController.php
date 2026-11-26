@@ -46,8 +46,8 @@ class ResourceController extends Controller
         }
 
         if ($request->filled('available_from') && $request->filled('available_to')) {
-            $from = Carbon::parse($request->input('available_from'));
-            $to = Carbon::parse($request->input('available_to'));
+            $from = Carbon::parse($request->input('available_from'))->utc();
+            $to = Carbon::parse($request->input('available_to'))->utc();
             $query->whereDoesntHave('bookings', fn ($q) => $q
                 ->whereIn('status', collect(BookingStatus::cases())
                     ->filter(fn ($s) => $s->holdsSlot())
@@ -58,18 +58,7 @@ class ResourceController extends Controller
             );
         }
 
-        $user = $request->user();
-        if (! $user->isAdmin()) {
-            $query->where(function ($q) use ($user) {
-                $q->whereDoesntHave('accessRules')
-                    ->orWhereHas('accessRules', function ($q) use ($user) {
-                        $q->where(function ($q) use ($user) {
-                            $q->whereIn('role_id', $user->roles()->pluck('roles.id'))
-                                ->orWhere('department_id', $user->department_id);
-                        });
-                    });
-            });
-        }
+        $query->accessibleBy($request->user());
 
         $resources = $query->paginate($request->input('per_page', 15));
         $resources->getCollection()->transform(fn (Resource $resource) => $this->presentResource($resource));
@@ -77,8 +66,10 @@ class ResourceController extends Controller
         return response()->json($resources);
     }
 
-    public function show(Resource $resource): JsonResponse
+    public function show(Request $request, Resource $resource): JsonResponse
     {
+        abort_unless($resource->isAccessibleBy($request->user()), 403);
+
         $resource->load(['location', 'room', 'asset', 'rules', 'accessRules', 'category']);
 
         return response()->json($this->presentResource($resource));
@@ -180,6 +171,12 @@ class ResourceController extends Controller
             return response()->json(['message' => 'Forbidden.'], 403);
         }
 
+        if ($resource->hasActiveBookings()) {
+            throw ValidationException::withMessages([
+                'resource' => 'Ruangan atau aset masih memiliki pemesanan aktif. Selesaikan atau batalkan pemesanan terlebih dahulu.',
+            ]);
+        }
+
         $resource->delete();
 
         return response()->json(['message' => 'Resource deleted.']);
@@ -187,6 +184,8 @@ class ResourceController extends Controller
 
     public function availability(Request $request, Resource $resource): JsonResponse
     {
+        abort_unless($resource->isAccessibleBy($request->user()), 403);
+
         $request->validate([
             'date' => ['required', 'date'],
         ]);

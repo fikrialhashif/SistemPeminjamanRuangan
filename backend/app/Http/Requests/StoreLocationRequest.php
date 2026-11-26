@@ -20,6 +20,8 @@ class StoreLocationRequest extends FormRequest
             'longitude' => ['required', 'numeric'],
             'radius' => ['integer', 'min:10'],
             'polygon' => ['nullable', 'array'],
+            'open_time' => ['sometimes', 'required_with:close_time', 'date_format:H:i'],
+            'close_time' => ['sometimes', 'required_with:open_time', 'date_format:H:i', 'after:open_time'],
         ];
     }
 }

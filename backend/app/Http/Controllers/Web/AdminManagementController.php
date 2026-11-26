@@ -41,7 +41,11 @@ class AdminManagementController extends Controller
     {
         $this->ensurePermission(Permission::LOCATIONS_CREATE);
 
-        Location::create($this->locationPayload($request));
+        $data = $this->locationPayload($request);
+        $data['open_time'] ??= Location::DEFAULT_OPEN_TIME;
+        $data['close_time'] ??= Location::DEFAULT_CLOSE_TIME;
+
+        Location::create($data);
 
         return back()->with('success', 'Lokasi ditambahkan.');
     }
@@ -259,6 +263,10 @@ class AdminManagementController extends Controller
             'reason' => ['nullable', 'string'],
         ]);
 
+        foreach (['starts_at', 'ends_at'] as $field) {
+            $validated[$field] = Carbon::parse($validated[$field], config('app.display_timezone'))->utc();
+        }
+
         Suspension::create($validated);
 
         return back()->with('success', 'Pembatasan akun dibuat.');
@@ -278,8 +286,8 @@ class AdminManagementController extends Controller
         $this->ensurePermission(Permission::BOOKINGS_VIEW);
 
         $now = now();
-        $todayStart = $now->copy()->startOfDay();
-        $todayEnd = $now->copy()->endOfDay();
+        $todayStart = $now->copy()->wib()->startOfDay()->utc();
+        $todayEnd = $now->copy()->wib()->endOfDay()->utc();
 
         $activeRoomBookings = Booking::with(['user.department', 'resource.location'])
             ->whereHas('resource', fn ($query) => $query->where('type', 'room'))
@@ -368,13 +376,12 @@ class AdminManagementController extends Controller
             return back()->withErrors(['loan' => 'Aset tidak berada pada status siap diserahkan.']);
         }
 
-        DB::transaction(function () use ($loan, $request) {
-            $loan->update([
-                'status' => LoanStatus::HANDED_OVER,
-                'handed_over_at' => now(),
-            ]);
+        if (! $loan->bookingAllowsHandover()) {
+            return back()->withErrors(['loan' => 'Pemesanan untuk aset ini tidak dalam status disetujui.']);
+        }
 
-            $loan->asset->update(['status' => 'in_use']);
+        DB::transaction(function () use ($loan, $request) {
+            $loan->markHandedOver();
 
             LoanEvent::create([
                 'asset_loan_id' => $loan->id,
@@ -401,10 +408,7 @@ class AdminManagementController extends Controller
         ]);
 
         DB::transaction(function () use ($loan, $request, $validated) {
-            $loan->update([
-                'status' => LoanStatus::RETURNED,
-                'returned_at' => now(),
-            ]);
+            $loan->markReturned($validated['condition']);
 
             ConditionReport::create([
                 'asset_loan_id' => $loan->id,
@@ -418,11 +422,6 @@ class AdminManagementController extends Controller
                 'event_type' => 'return',
                 'actor_id' => $request->user()->id,
                 'data' => ['condition' => $validated['condition'], 'source' => 'admin_web'],
-            ]);
-
-            $loan->asset->update([
-                'condition' => $validated['condition'],
-                'status' => 'available',
             ]);
         });
 
@@ -438,8 +437,9 @@ class AdminManagementController extends Controller
             'to' => ['nullable', 'date', 'after_or_equal:from'],
         ]);
 
-        $from = Carbon::parse($request->input('from', now()->startOfMonth()->toDateString()))->startOfDay();
-        $to = Carbon::parse($request->input('to', now()->endOfMonth()->toDateString()))->endOfDay();
+        $timezone = config('app.display_timezone');
+        $from = Carbon::parse($request->input('from') ?? now()->wib()->startOfMonth()->toDateString(), $timezone)->startOfDay()->utc();
+        $to = Carbon::parse($request->input('to') ?? now()->wib()->endOfMonth()->toDateString(), $timezone)->endOfDay()->utc();
 
         $bookings = Booking::whereBetween('starts_at', [$from, $to]);
 
@@ -485,8 +485,8 @@ class AdminManagementController extends Controller
             'face_success' => $totalAttempts > 0 ? round($facePass / $totalAttempts * 100, 1) : 0,
         ];
 
-        $fromInput = $from->toDateString();
-        $toInput = $to->toDateString();
+        $fromInput = $from->wib()->toDateString();
+        $toInput = $to->wib()->toDateString();
 
         return view('admin.reports', compact(
             'fromInput',
@@ -522,10 +522,17 @@ class AdminManagementController extends Controller
             'longitude' => ['required', 'numeric', 'between:-180,180'],
             'radius' => ['required_if:geofence_type,radius', 'nullable', 'integer', 'min:10'],
             'polygon' => ['nullable', 'string'],
+            'open_time' => ['nullable', 'required_with:close_time', 'date_format:H:i'],
+            'close_time' => ['nullable', 'required_with:open_time', 'date_format:H:i', 'after:open_time'],
         ]);
 
         $type = $data['geofence_type'];
         unset($data['geofence_type']);
+
+        // Empty inputs leave the stored hours untouched.
+        if (blank($data['open_time'] ?? null)) {
+            unset($data['open_time'], $data['close_time']);
+        }
 
         if ($type === 'polygon') {
             $points = json_decode((string) ($data['polygon'] ?? ''), true);
@@ -565,8 +572,8 @@ class AdminManagementController extends Controller
         return [
             'checkin_window_before_minutes' => ['group' => 'Kehadiran & verifikasi', 'label' => 'Batas waktu masuk sebelum jadwal', 'type' => 'integer', 'default' => 15, 'hint' => 'Berapa menit sebelum jadwal masuk masih diterima.'],
             'checkin_window_after_minutes' => ['group' => 'Kehadiran & verifikasi', 'label' => 'Batas waktu masuk setelah jadwal', 'type' => 'integer', 'default' => 15, 'hint' => 'Berapa menit setelah jadwal masuk masih diterima.'],
-            'check_in_window_minutes' => ['group' => 'Kehadiran & verifikasi', 'label' => 'Batas masuk sebelum dinyatakan tidak hadir', 'type' => 'integer', 'default' => 15, 'hint' => 'Dipakai untuk menandai pemesanan yang tidak dihadiri.'],
-            'face_verification_enabled' => ['group' => 'Kehadiran & verifikasi', 'label' => 'Wajib verifikasi wajah', 'type' => 'boolean', 'default' => false, 'hint' => 'Aktifkan hanya jika layanan verifikasi wajah siap.'],
+            'check_in_window_minutes' => ['group' => 'Kehadiran & verifikasi', 'label' => 'Batas masuk sebelum dinyatakan tidak hadir', 'type' => 'integer', 'default' => 15, 'hint' => 'Dipakai untuk menandai pemesanan yang tidak dihadiri. Tidak berlaku lebih cepat dari batas waktu masuk setelah jadwal.'],
+            'face_verification_enabled' => ['group' => 'Kehadiran & verifikasi', 'label' => 'Wajib verifikasi wajah untuk aset', 'type' => 'boolean', 'default' => false, 'hint' => 'Ruangan selalu memerlukan verifikasi wajah.'],
             'checkin_failure_strike_threshold' => ['group' => 'Kehadiran & verifikasi', 'label' => 'Batas gagal masuk sebelum pelanggaran', 'type' => 'integer', 'default' => 3, 'hint' => 'Jumlah kegagalan sebelum pelanggaran dicatat.'],
             'gps_accuracy_threshold_meters' => ['group' => 'Lokasi', 'label' => 'Akurasi lokasi maksimum (meter)', 'type' => 'integer', 'default' => 50, 'hint' => 'Nilai akurasi yang masih diterima.'],
             'gps_freshness_seconds' => ['group' => 'Lokasi', 'label' => 'Umur data lokasi maksimum (detik)', 'type' => 'integer', 'default' => 30, 'hint' => 'Data lokasi yang lebih lama akan ditolak.'],

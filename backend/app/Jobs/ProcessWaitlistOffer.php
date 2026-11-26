@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Setting;
 use App\Models\WaitlistEntry;
+use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -22,6 +23,11 @@ class ProcessWaitlistOffer implements ShouldQueue
 
     public function handle(): void
     {
+        // A slot that already started cannot be booked, so offering it is pointless.
+        if (Carbon::parse($this->desiredStart)->isPast()) {
+            return;
+        }
+
         $entry = WaitlistEntry::where('resource_id', $this->resourceId)
             ->where('desired_start', $this->desiredStart)
             ->where('desired_end', $this->desiredEnd)

@@ -10,6 +10,7 @@ use App\Models\Facility;
 use App\Models\Room;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Illuminate\View\View;
@@ -111,7 +112,20 @@ class MasterDataController extends Controller
             'name' => ['required', 'string', 'max:255', Rule::unique('facilities', 'name')->ignore($facility->id)],
         ]);
 
-        $facility->update($validated);
+        // Rooms store facility names, so a rename has to be carried over to them.
+        DB::transaction(function () use ($facility, $validated): void {
+            $previousName = $facility->name;
+            $facility->update($validated);
+
+            Room::whereJsonContains('facilities', $previousName)->get()->each(
+                fn (Room $room) => $room->update([
+                    'facilities' => array_map(
+                        fn (string $name): string => $name === $previousName ? $facility->name : $name,
+                        $room->facilities,
+                    ),
+                ]),
+            );
+        });
 
         return back()->with('success', 'Fasilitas diperbarui.');
     }

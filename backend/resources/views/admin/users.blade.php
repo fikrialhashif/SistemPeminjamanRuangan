@@ -72,7 +72,7 @@
                                         @endforelse
                                     </div>
                                 </td>
-                                <td data-label="Dibuat">{{ $user->created_at->locale('id')->isoFormat('D MMM Y') }}</td>
+                                <td data-label="Dibuat">{{ $user->created_at->wib()->locale('id')->isoFormat('D MMM Y') }}</td>
                                 <td data-label="Aksi" class="data-actions">
                                     @if(auth()->user()->hasPermission('users.update'))
                                         <button type="button" class="btn btn--ghost btn--sm" data-open-dialog="editUser{{ $user->id }}">Ubah</button>

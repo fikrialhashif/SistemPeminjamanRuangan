@@ -6,6 +6,8 @@
     $latitudeValue = old('latitude', $location?->latitude ?? 0.5201724);
     $longitudeValue = old('longitude', $location?->longitude ?? 101.4539465);
     $polygonValue = old('polygon', is_array($polygon) ? json_encode($polygon, JSON_UNESCAPED_SLASHES) : '');
+    $openTimeValue = old('open_time', substr($location?->open_time ?? \App\Models\Location::DEFAULT_OPEN_TIME, 0, 5));
+    $closeTimeValue = old('close_time', substr($location?->close_time ?? \App\Models\Location::DEFAULT_CLOSE_TIME, 0, 5));
 @endphp
 
 <div class="location-editor" data-location-editor>
@@ -17,6 +19,15 @@
         <div class="field field--wide">
             <label class="field-label" for="{{ $prefix }}_address">Alamat</label>
             <input class="input" type="text" id="{{ $prefix }}_address" name="address" value="{{ old('address', $location?->address) }}" placeholder="Lantai, gedung, atau patokan">
+        </div>
+
+        <div class="field">
+            <label class="field-label" for="{{ $prefix }}_open_time">Jam buka (WIB)</label>
+            <input class="input" type="time" id="{{ $prefix }}_open_time" name="open_time" value="{{ $openTimeValue }}">
+        </div>
+        <div class="field">
+            <label class="field-label" for="{{ $prefix }}_close_time">Jam tutup (WIB)</label>
+            <input class="input" type="time" id="{{ $prefix }}_close_time" name="close_time" value="{{ $closeTimeValue }}">
         </div>
 
         <div class="field field--wide">

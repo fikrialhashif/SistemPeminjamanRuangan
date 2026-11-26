@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\FaceEnrollRequest;
+use App\Models\FaceEnrollment;
 use App\Models\Setting;
 use App\Services\FaceVerificationService;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -41,14 +43,15 @@ class FaceController extends Controller
             ], 503);
         }
 
-        $user->faceEnrollment()->updateOrCreate(
-            ['user_id' => $user->id],
-            [
-                'consent_given_at' => now(),
-                'status' => 'enrolled',
-                'samples_count' => count($request->input('images')),
-            ],
-        );
+        $enrollment = FaceEnrollment::withTrashed()->firstOrNew(['user_id' => $user->id]);
+        $enrollment->fill([
+            'consent_given_at' => now(),
+            'status' => 'enrolled',
+            'samples_count' => count($request->input('images')),
+        ]);
+        // A deleted enrollment still occupies the unique user_id, so it is revived.
+        $enrollment->deleted_at = null;
+        $enrollment->save();
 
         return response()->json($result, 201);
     }
@@ -83,7 +86,21 @@ class FaceController extends Controller
     public function destroy(Request $request): JsonResponse
     {
         $user = $request->user();
-        $this->faceVerificationService->deleteUserData($user);
+
+        try {
+            $deleted = $this->faceVerificationService->deleteUserData($user);
+        } catch (ConnectionException) {
+            $deleted = false;
+        }
+
+        // Keep the local record so the user can retry until the biometric data is really gone.
+        if (! $deleted) {
+            return response()->json([
+                'code' => 'face_service_unavailable',
+                'message' => 'Data wajah belum terhapus karena layanan wajah tidak tersedia. Coba lagi nanti.',
+            ], 503);
+        }
+
         $user->faceEnrollment?->delete();
 
         return response()->json(['message' => 'Face data deleted.']);

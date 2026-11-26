@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_error.dart';
 import '../../../core/network/dio_provider.dart';
+import '../../../core/network/pagination.dart';
 
 final resourceRepositoryProvider = Provider<ResourceRepository>(
   (ref) => ResourceRepository(ref.read(dioProvider)),
@@ -20,9 +21,10 @@ class ResourceRepository {
     int? capacityMin,
   }) async {
     try {
-      final response = await _dio.get(
+      return await fetchAllPages(
+        _dio,
         '/resources',
-        queryParameters: {
+        query: {
           if (search?.isNotEmpty == true) 'search': search,
           if (type?.isNotEmpty == true) 'type': type,
           if (category?.isNotEmpty == true) 'category': category,
@@ -30,12 +32,6 @@ class ResourceRepository {
           'capacity_min': ?capacityMin,
         },
       );
-      final data = response.data is Map
-          ? (response.data['data'] as List? ?? const [])
-          : response.data as List;
-      return data
-          .map((item) => Map<String, dynamic>.from(item as Map))
-          .toList();
     } catch (error) {
       throw mapDioError(error);
     }

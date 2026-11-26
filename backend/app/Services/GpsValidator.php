@@ -33,7 +33,7 @@ class GpsValidator
 
         $freshnessSeconds = Setting::get('gps_freshness_seconds', 30);
         $gpsTime = Carbon::parse($timestamp);
-        if (now()->diffInSeconds($gpsTime) > $freshnessSeconds) {
+        if (abs($gpsTime->diffInSeconds(now())) > $freshnessSeconds) {
             $reasons[] = 'GPS reading is stale';
         }
 

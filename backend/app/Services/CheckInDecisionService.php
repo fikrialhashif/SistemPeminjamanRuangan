@@ -9,6 +9,7 @@ use App\Models\Booking;
 use App\Models\CheckInAttempt;
 use App\Models\Setting;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Cache;
@@ -27,6 +28,7 @@ class CheckInDecisionService
     public function process(Booking $booking, User $user, array $evidence): CheckInAttempt
     {
         $this->validateOwnership($booking, $user);
+        $this->validateLocationConfigured($booking);
 
         $timeOutcome = $this->verificationTimePolicy->evaluateForBooking($booking);
         $rejectionReasons = [];
@@ -45,7 +47,6 @@ class CheckInDecisionService
             $rejectionReasons[] = 'qr: '.$qrResult['reason'];
         }
 
-        $booking->loadMissing('resource.location');
         $location = $booking->resource->location;
 
         $gpsResult = $this->gpsValidator->validate(
@@ -141,7 +142,7 @@ class CheckInDecisionService
             'gps_latitude' => $evidence['gps_latitude'],
             'gps_longitude' => $evidence['gps_longitude'],
             'gps_accuracy' => $evidence['gps_accuracy'],
-            'gps_timestamp' => $evidence['gps_timestamp'],
+            'gps_timestamp' => Carbon::parse($evidence['gps_timestamp'])->utc(),
             'face_score' => $faceScore,
             'liveness_passed' => $livenessPassed,
             'rejection_reasons' => ! empty($rejectionReasons) ? $rejectionReasons : null,
@@ -173,21 +174,32 @@ class CheckInDecisionService
         }
     }
 
+    /**
+     * A missing room location is a setup error, so no attempt is recorded and no strike can follow.
+     */
+    private function validateLocationConfigured(Booking $booking): void
+    {
+        $booking->loadMissing('resource.location');
+
+        if ($booking->resource?->location === null) {
+            throw ValidationException::withMessages([
+                'location' => 'Lokasi ruangan belum diatur. Hubungi pengelola.',
+            ]);
+        }
+    }
+
     private function determineResult(bool $timeValid, bool $qrValid, bool $gpsValid, ?bool $faceValid): CheckInResult
     {
-        if (! $timeValid) {
+        // Manual review only covers an inconclusive face check; the other factors must already pass.
+        if (! $timeValid || ! $qrValid || ! $gpsValid) {
             return CheckInResult::REJECTED;
         }
 
-        if ($faceValid === null) {
-            return CheckInResult::NEEDS_MANUAL_REVIEW;
-        }
-
-        if ($qrValid && $gpsValid && $faceValid) {
-            return CheckInResult::ACCEPTED;
-        }
-
-        return CheckInResult::REJECTED;
+        return match ($faceValid) {
+            null => CheckInResult::NEEDS_MANUAL_REVIEW,
+            true => CheckInResult::ACCEPTED,
+            false => CheckInResult::REJECTED,
+        };
     }
 
     private function handleRepeatedFailures(Booking $booking, User $user): void
@@ -202,12 +214,11 @@ class CheckInDecisionService
                 ->contains(fn ($reason) => str_starts_with(strtolower((string) $reason), 'time:')))
             ->count();
 
-        if ($recentFailures >= $threshold) {
-            $this->penaltyService->issueStrike(
-                $user,
-                "Repeated check-in failures for booking #{$booking->id}",
-                $booking,
-            );
+        $reason = "Repeated check-in failures for booking #{$booking->id}";
+
+        // A cancelled strike counts too, so an admin's cancellation is not undone by the next attempt.
+        if ($recentFailures >= $threshold && ! $user->strikes()->where('reason', $reason)->exists()) {
+            $this->penaltyService->issueStrike($user, $reason, $booking);
         }
     }
 }

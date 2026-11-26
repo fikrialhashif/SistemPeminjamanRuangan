@@ -75,6 +75,13 @@ class FaceRepository {
   }
 }
 
+/// Mirrors the server rule: rooms always need the face, assets only when the
+/// setting reported by `/face/status` is on.
+bool faceVerificationRequired(
+  Map<String, dynamic> status,
+  Object? resourceType,
+) => resourceType == 'room' || status['enabled'] == true;
+
 String faceChallengeInstruction(String? challengeType) =>
     switch (challengeType) {
       'turn' => 'Tolehkan kepala ke kiri atau kanan',

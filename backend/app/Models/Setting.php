@@ -36,7 +36,8 @@ class Setting extends Model
     {
         $storeValue = match ($type) {
             'json', 'array' => json_encode($value),
-            'boolean' => $value ? 'true' : 'false',
+            // "false" and "0" mean false, matching how get() reads the value back.
+            'boolean' => filter_var($value, FILTER_VALIDATE_BOOLEAN) ? 'true' : 'false',
             default => (string) $value,
         };
 

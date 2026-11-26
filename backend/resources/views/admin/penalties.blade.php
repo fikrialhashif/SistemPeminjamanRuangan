@@ -44,8 +44,8 @@
                                 <tr>
                                     <td data-label="Waktu">
                                         <div class="cell-time">
-                                            {{ $strike->created_at->locale('id')->isoFormat('D MMM Y') }}
-                                            <span class="cell-time-sub">{{ $strike->created_at->format('H:i') }}</span>
+                                            {{ $strike->created_at->wib()->locale('id')->isoFormat('D MMM Y') }}
+                                            <span class="cell-time-sub">{{ $strike->created_at->wib()->format('H:i') }}</span>
                                         </div>
                                     </td>
                                     <td data-label="Pengguna">
@@ -118,8 +118,8 @@
                                         <div class="cell-title">{{ $suspension->user->name ?? 'Tidak dikenal' }}</div>
                                         <div class="cell-sub">{{ $suspension->user->email ?? '' }}</div>
                                     </td>
-                                    <td data-label="Mulai">{{ $suspension->starts_at->locale('id')->isoFormat('D MMM Y H:i') }}</td>
-                                    <td data-label="Selesai">{{ $suspension->ends_at->locale('id')->isoFormat('D MMM Y H:i') }}</td>
+                                    <td data-label="Mulai">{{ $suspension->starts_at->wib()->locale('id')->isoFormat('D MMM Y H:i') }}</td>
+                                    <td data-label="Selesai">{{ $suspension->ends_at->wib()->locale('id')->isoFormat('D MMM Y H:i') }}</td>
                                     <td data-label="Alasan">{{ $suspension->reason ?: '—' }}</td>
                                     <td data-label="Status">
                                         @if($suspension->ends_at->isFuture())
@@ -208,11 +208,11 @@
                     </div>
                     <div class="field">
                         <label class="field-label" for="suspension_start">Mulai</label>
-                        <input class="input" type="datetime-local" id="suspension_start" name="starts_at" value="{{ old('starts_at', now()->format('Y-m-d\TH:i')) }}" required>
+                        <input class="input" type="datetime-local" id="suspension_start" name="starts_at" value="{{ old('starts_at', now()->wib()->format('Y-m-d\TH:i')) }}" required>
                     </div>
                     <div class="field">
                         <label class="field-label" for="suspension_end">Selesai</label>
-                        <input class="input" type="datetime-local" id="suspension_end" name="ends_at" value="{{ old('ends_at', now()->addDays(7)->format('Y-m-d\TH:i')) }}" required>
+                        <input class="input" type="datetime-local" id="suspension_end" name="ends_at" value="{{ old('ends_at', now()->wib()->addDays(7)->format('Y-m-d\TH:i')) }}" required>
                     </div>
                     <div class="field field--wide">
                         <label class="field-label" for="suspension_reason">Alasan</label>

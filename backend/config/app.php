@@ -68,6 +68,11 @@ return [
     'timezone' => 'UTC',
 
     /*
+     * Timestamps are stored in UTC. The admin panel shows and reads them in this zone.
+     */
+    'display_timezone' => 'Asia/Jakarta',
+
+    /*
     |--------------------------------------------------------------------------
     | Application Locale Configuration
     |--------------------------------------------------------------------------

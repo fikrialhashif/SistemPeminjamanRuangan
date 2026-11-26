@@ -119,6 +119,21 @@ def verify(req: VerifyRequest):
     reason = "Match found" if matched else "No match"
     if not liveness_passed:
         reason = "Head turn not detected"
+    elif req.challenge_type and req.front_image:
+        # The head turn only proves liveness if it is the same person as the identity frame.
+        try:
+            turn_embedding = face_engine.extract_embedding(image)
+        except FaceQualityError as error:
+            liveness_passed = False
+            reason = error.reason
+        else:
+            turn_score = max(
+                face_engine.compare_embeddings(turn_embedding, sample)
+                for sample in [*embeddings, embedding]
+            )
+            if turn_score < settings.LIVENESS_IDENTITY_THRESHOLD:
+                liveness_passed = False
+                reason = "Head turn frame does not match the enrolled face"
 
     return VerifyResponse(
         match=matched and liveness_passed,

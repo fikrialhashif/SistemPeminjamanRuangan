@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import 'core/session/session_expiry.dart';
 import 'core/theme/app_theme.dart';
+import 'features/auth/presentation/auth_controller.dart';
 import 'features/bookings/presentation/booking_detail_page.dart';
 import 'features/bookings/presentation/booking_form_page.dart';
 import 'features/bookings/presentation/booking_selection.dart';
@@ -53,6 +54,11 @@ GoRouter buildAppRouter() => GoRouter(
       path: '/bookings',
       builder: (context, state) => const MyBookingsPage(),
     ),
+    // Fixed paths come before ':bookingId', which would otherwise capture them.
+    GoRoute(
+      path: '/bookings/bundled',
+      builder: (context, state) => const BundledBookingPage(),
+    ),
     GoRoute(
       path: '/bookings/:bookingId',
       builder: (context, state) {
@@ -88,10 +94,6 @@ GoRouter buildAppRouter() => GoRouter(
       path: '/bookings/:bookingId/check-in',
       builder: (context, state) =>
           CheckInPage(bookingId: state.pathParameters['bookingId']!),
-    ),
-    GoRoute(
-      path: '/bookings/bundled',
-      builder: (context, state) => const BundledBookingPage(),
     ),
     GoRoute(
       path: '/bookings/:bookingId/waitlist',
@@ -142,7 +144,12 @@ class _BookingAppState extends ConsumerState<BookingApp> {
   @override
   Widget build(BuildContext context) {
     ref.listen<int>(sessionExpiryProvider, (previous, next) {
-      if (next > (previous ?? 0)) _router.go('/');
+      if (next <= (previous ?? 0)) return;
+      // While the stored session is still being restored there is no user yet.
+      if (ref.read(authControllerProvider).value != null) {
+        ref.read(authControllerProvider.notifier).clearSession();
+      }
+      _router.go('/');
     });
     return MaterialApp.router(
       title: 'Smart Room Booking',

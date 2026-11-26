@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\BookingStatus;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -10,6 +11,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Approval extends Model
 {
     use Auditable;
+
+    /**
+     * Statuses that no longer block the next level. "escalated" means the level
+     * timed out and the decision moved up.
+     */
+    public const CLEARED_STATUSES = ['approved', 'escalated'];
 
     protected $fillable = [
         'booking_id',
@@ -29,16 +36,29 @@ class Approval extends Model
         ];
     }
 
-    public function scopeActionable(Builder $query): Builder
+    /**
+     * Undecided approvals of bookings that are still waiting; cancelled or expired bookings drop out.
+     */
+    public function scopeAwaitingDecision(Builder $query): Builder
     {
         return $query
             ->where('status', 'pending')
+            ->whereRelation('booking', 'status', BookingStatus::PENDING);
+    }
+
+    /**
+     * Awaiting approvals whose earlier levels no longer block them.
+     */
+    public function scopeActionable(Builder $query): Builder
+    {
+        return $query
+            ->awaitingDecision()
             ->whereNotExists(function ($subquery) {
                 $subquery->selectRaw('1')
                     ->from('approvals as previous')
                     ->whereColumn('previous.booking_id', 'approvals.booking_id')
                     ->whereColumn('previous.level', '<', 'approvals.level')
-                    ->where('previous.status', '!=', 'approved');
+                    ->whereNotIn('previous.status', self::CLEARED_STATUSES);
             });
     }
 

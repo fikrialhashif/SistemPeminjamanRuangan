@@ -126,8 +126,9 @@ class AdminPanelTest extends TestCase
             ->get(route('admin.approvals'))
             ->assertOk()
             ->assertSee('Jadwal')
-            ->assertSee('10:00')
-            ->assertSee('12:00');
+            // Stored as 10:00-12:00 UTC, shown in WIB.
+            ->assertSee('17:00')
+            ->assertSee('19:00');
     }
 
     public function test_audit_trail_records_changes_without_hidden_credentials(): void

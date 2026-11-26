@@ -28,7 +28,7 @@ class ApprovalService
 
         $booking = $approval->booking;
         $allApproved = $booking->approvals()
-            ->where('status', '!=', 'approved')
+            ->whereNotIn('status', Approval::CLEARED_STATUSES)
             ->doesntExist();
 
         if ($allApproved) {
@@ -102,13 +102,19 @@ class ApprovalService
         if ($approval->status !== 'pending') {
             throw ValidationException::withMessages(['approval' => 'This approval has already been decided.']);
         }
+
+        if ($approval->booking->status !== BookingStatus::PENDING) {
+            throw ValidationException::withMessages([
+                'approval' => 'Pemesanan ini sudah tidak menunggu persetujuan.',
+            ]);
+        }
     }
 
     private function validatePreviousLevel(Approval $approval): void
     {
         $hasUnapprovedPreviousLevel = $approval->booking->approvals()
             ->where('level', '<', $approval->level)
-            ->where('status', '!=', 'approved')
+            ->whereNotIn('status', Approval::CLEARED_STATUSES)
             ->exists();
 
         if ($hasUnapprovedPreviousLevel) {

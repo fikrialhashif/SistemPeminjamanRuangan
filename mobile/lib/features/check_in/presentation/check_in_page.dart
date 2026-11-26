@@ -567,7 +567,15 @@ class _CheckInPageState extends ConsumerState<CheckInPage> {
       final faceRepository = ref.read(faceRepositoryProvider);
       final status = await faceRepository.status();
       if (!mounted || step != 2) return;
-      final enabled = status['enabled'] == true;
+      final booking = ref
+          .read(bookingDetailProvider(widget.bookingId))
+          .asData
+          ?.value;
+      final resource = booking?['resource'];
+      final enabled = faceVerificationRequired(
+        status,
+        resource is Map ? resource['type'] : null,
+      );
       final enrolled = status['enrolled'] == true;
       setState(() {
         faceEnabled = enabled;

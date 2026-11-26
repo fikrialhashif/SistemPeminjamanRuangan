@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\Permission;
 use App\Enums\ResourceType;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rules\Enum;
@@ -10,7 +11,7 @@ class UpdateResourceRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->isAdmin() || $this->user()->hasRole('resource_manager');
+        return $this->user()->hasPermission(Permission::RESOURCES_UPDATE);
     }
 
     public function rules(): array

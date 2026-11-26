@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_error.dart';
 import '../../../core/network/dio_provider.dart';
+import '../../../core/network/pagination.dart';
 import 'availability_schedule.dart';
 
 final bookingRepositoryProvider = Provider<BookingRepository>(
@@ -57,11 +58,7 @@ class BookingRepository {
 
   Future<List<Map<String, dynamic>>> list() async {
     try {
-      final response = await _dio.get('/bookings');
-      final data = (response.data as Map)['data'] as List? ?? const [];
-      return data
-          .map((item) => Map<String, dynamic>.from(item as Map))
-          .toList();
+      return await fetchAllPages(_dio, '/bookings');
     } catch (error) {
       throw mapDioError(error);
     }

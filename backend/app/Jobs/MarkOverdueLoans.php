@@ -17,7 +17,7 @@ class MarkOverdueLoans implements ShouldQueue
 
     public function handle(PenaltyService $penaltyService): void
     {
-        AssetLoan::where('status', LoanStatus::IN_USE)
+        AssetLoan::whereIn('status', [LoanStatus::HANDED_OVER, LoanStatus::IN_USE])
             ->whereNotNull('due_at')
             ->where('due_at', '<', now())
             ->each(function (AssetLoan $loan) use ($penaltyService) {

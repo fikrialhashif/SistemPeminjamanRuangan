@@ -2,13 +2,14 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\Permission;
 use Illuminate\Foundation\Http\FormRequest;
 
 class LoanOverrideRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->hasAnyRole(['resource_manager', 'admin']) ?? false;
+        return $this->user()?->hasPermission(Permission::LOANS_UPDATE) ?? false;
     }
 
     public function rules(): array

@@ -621,7 +621,7 @@ class _HandoverPageState extends ConsumerState<HandoverPage> {
     return _StepCard(
       icon: Icons.face,
       title: 'Langkah 3 - Verifikasi wajah',
-      description: 'Ambil foto wajah untuk dicocokkan dengan data wajah terdaftar. Server yang menentukan hasil pencocokan.',
+      description: 'Minta peminjam menghadap kamera. Server mencocokkan fotonya dengan data wajah peminjam yang terdaftar.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

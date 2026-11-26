@@ -15,10 +15,10 @@ class ExpirePendingApprovals implements ShouldQueue
 
     public function handle(): void
     {
-        Approval::where('status', 'pending')
+        Approval::awaitingDecision()
             ->whereNotNull('expires_at')
             ->where('expires_at', '<=', now())
-            ->each(function (Approval $approval) {
+            ->eachById(function (Approval $approval) {
                 $nextLevel = Approval::where('booking_id', $approval->booking_id)
                     ->where('level', '>', $approval->level)
                     ->where('status', 'pending')

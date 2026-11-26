@@ -30,11 +30,11 @@ class SettingController extends Controller
             'type' => ['sometimes', 'string', 'in:string,boolean,integer,float,json,array'],
         ]);
 
-        Setting::set(
-            $request->input('key'),
-            $request->input('value'),
-            $request->input('type', 'string'),
-        );
+        $type = $request->input('type')
+            ?? Setting::where('key', $request->input('key'))->value('type')
+            ?? 'string';
+
+        Setting::set($request->input('key'), $request->input('value'), $type);
 
         return response()->json(['message' => 'Setting updated.']);
     }

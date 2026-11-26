@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Enums\Role;
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ApprovalDecisionRequest;
 use App\Models\Approval;
@@ -18,7 +18,7 @@ class ApprovalController extends Controller
 
     public function pending(Request $request): JsonResponse
     {
-        if ($forbidden = $this->forbiddenResponse($request)) {
+        if ($forbidden = $this->forbiddenResponse($request, Permission::APPROVALS_VIEW)) {
             return $forbidden;
         }
 
@@ -32,7 +32,7 @@ class ApprovalController extends Controller
 
     public function approve(ApprovalDecisionRequest $request, Approval $approval): JsonResponse
     {
-        if ($forbidden = $this->forbiddenResponse($request)) {
+        if ($forbidden = $this->forbiddenResponse($request, Permission::APPROVALS_UPDATE)) {
             return $forbidden;
         }
 
@@ -43,7 +43,7 @@ class ApprovalController extends Controller
 
     public function reject(ApprovalDecisionRequest $request, Approval $approval): JsonResponse
     {
-        if ($forbidden = $this->forbiddenResponse($request)) {
+        if ($forbidden = $this->forbiddenResponse($request, Permission::APPROVALS_UPDATE)) {
             return $forbidden;
         }
 
@@ -52,11 +52,9 @@ class ApprovalController extends Controller
         return response()->json(['message' => 'Rejected.']);
     }
 
-    private function forbiddenResponse(Request $request): ?JsonResponse
+    private function forbiddenResponse(Request $request, Permission $permission): ?JsonResponse
     {
-        $user = $request->user();
-
-        if ($user->isAdmin() || $user->hasRole(Role::APPROVER->value)) {
+        if ($request->user()->hasPermission($permission)) {
             return null;
         }
 

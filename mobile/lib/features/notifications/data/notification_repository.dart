@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_error.dart';
 import '../../../core/network/dio_provider.dart';
+import '../../../core/network/pagination.dart';
 
 final notificationRepositoryProvider = Provider<NotificationRepository>(
   (ref) => NotificationRepository(ref.read(dioProvider)),
@@ -14,11 +15,7 @@ class NotificationRepository {
 
   Future<List<Map<String, dynamic>>> list() async {
     try {
-      final response = await _dio.get('/notifications');
-      final body = Map<String, dynamic>.from(response.data as Map);
-      return (body['data'] as List? ?? [])
-          .map((item) => Map<String, dynamic>.from(item as Map))
-          .toList();
+      return await fetchAllPages(_dio, '/notifications');
     } catch (error) {
       throw mapDioError(error);
     }

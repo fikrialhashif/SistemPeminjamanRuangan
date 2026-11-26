@@ -10,6 +10,10 @@ class Location extends Model
 {
     use Auditable;
 
+    public const DEFAULT_OPEN_TIME = '07:00';
+
+    public const DEFAULT_CLOSE_TIME = '22:00';
+
     protected $fillable = [
         'name',
         'address',

@@ -51,7 +51,8 @@ class QrStaticLabelTest extends TestCase
     {
         $room = $this->room('Ruang Rapat A1');
 
-        $this->get(route('resources.qr', $room))
+        $this->actingAs($this->userWithRole(RoleEnum::ADMIN))
+            ->get(route('resources.qr', $room))
             ->assertOk()
             ->assertSee('QR pintu · statis', false)
             ->assertSee('Cetak QR')
@@ -64,7 +65,8 @@ class QrStaticLabelTest extends TestCase
     {
         $resource = $this->asset('Kamera DSLR', 'CAM-001');
 
-        $this->get(route('resources.asset-label', $resource))
+        $this->actingAs($this->userWithRole(RoleEnum::ADMIN))
+            ->get(route('resources.asset-label', $resource))
             ->assertOk()
             ->assertSee('Kode aset · statis', false)
             ->assertSee('Kode CAM-001', false)

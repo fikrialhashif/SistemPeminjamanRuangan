@@ -110,8 +110,8 @@
                             <tr>
                                 <td data-label="Waktu">
                                     <div class="cell-time">
-                                        {{ $log->created_at->locale('id')->isoFormat('D MMM Y') }}
-                                        <span class="cell-time-sub">{{ $log->created_at->format('H:i:s') }}</span>
+                                        {{ $log->created_at->wib()->locale('id')->isoFormat('D MMM Y') }}
+                                        <span class="cell-time-sub">{{ $log->created_at->wib()->format('H:i:s') }}</span>
                                     </div>
                                 </td>
                                 <td data-label="Pengguna">

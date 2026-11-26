@@ -11,6 +11,16 @@ class OperatingHoursResolver
 {
     public function resolve(Resource $resource, Carbon $date): OperatingHours
     {
+        return $this->find($resource, $date) ?? throw ValidationException::withMessages([
+            'date' => 'Jam operasional resource belum diatur.',
+        ]);
+    }
+
+    /**
+     * Returns null when neither the room nor its location has operating hours.
+     */
+    public function find(Resource $resource, Carbon $date): ?OperatingHours
+    {
         $resource->loadMissing('room', 'location');
 
         if ($resource->room && $resource->room->open_time && $resource->room->close_time) {
@@ -31,9 +41,7 @@ class OperatingHoursResolver
             );
         }
 
-        throw ValidationException::withMessages([
-            'date' => 'Jam operasional resource belum diatur.',
-        ]);
+        return null;
     }
 
     private function hours(Carbon $date, string $open, string $close, string $source): OperatingHours

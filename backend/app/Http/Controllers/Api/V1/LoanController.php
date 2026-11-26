@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Data\VerificationStepOutcome;
 use App\Enums\LoanStatus;
+use App\Enums\Permission;
 use App\Enums\VerificationStage;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\HandoverRequest;
@@ -17,6 +18,8 @@ use App\Services\GpsValidator;
 use App\Services\QrTokenService;
 use App\Services\VerificationSessionBuilder;
 use App\Services\VerificationTimePolicy;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -37,7 +40,7 @@ class LoanController extends Controller
         $user = $request->user();
         $query = AssetLoan::with(['asset.resource', 'booking', 'user']);
 
-        if (! $user->isAdmin() && ! $user->hasRole('resource_manager')) {
+        if (! $user->hasPermission(Permission::LOANS_VIEW)) {
             $query->where('user_id', $user->id);
         }
 
@@ -56,6 +59,10 @@ class LoanController extends Controller
             return response()->json(['message' => 'Loan is not in reserved state.'], 422);
         }
 
+        if (! $assetLoan->bookingAllowsHandover()) {
+            return response()->json(['message' => 'Pemesanan untuk aset ini tidak dalam status disetujui.'], 422);
+        }
+
         $timeOutcome = $assetLoan->booking
             ? $this->verificationTimePolicy->evaluateForBooking($assetLoan->booking)
             : new VerificationStepOutcome(VerificationStage::TIME, false, 'Jadwal peminjaman tidak ditemukan.');
@@ -72,13 +79,7 @@ class LoanController extends Controller
                 : 'QR aset tidak valid.');
         $qrOutcome = new VerificationStepOutcome(VerificationStage::QR, $tokenResult['valid'], $qrReason);
 
-        $faceResult = $this->faceVerificationService->verify($request->user(), $request->input('face_image'));
-        $faceValid = (bool) ($faceResult['match'] ?? false);
-        $faceOutcome = new VerificationStepOutcome(
-            VerificationStage::FACE,
-            $faceValid,
-            $faceValid ? null : 'Verifikasi wajah gagal.',
-        );
+        $faceOutcome = $this->evaluateBorrowerFace($assetLoan, (string) $request->input('face_image'));
 
         $session = $this->verificationSessionBuilder->forHandover($assetLoan->id, [
             'location' => $locationOutcome,
@@ -100,12 +101,7 @@ class LoanController extends Controller
         $assetCode = $assetLoan->asset->code;
 
         DB::transaction(function () use ($assetLoan, $request, $assetCode) {
-            $assetLoan->update([
-                'status' => LoanStatus::HANDED_OVER,
-                'handed_over_at' => now(),
-            ]);
-
-            $assetLoan->asset->update(['status' => 'in_use']);
+            $assetLoan->markHandedOver();
 
             LoanEvent::create([
                 'asset_loan_id' => $assetLoan->id,
@@ -161,14 +157,11 @@ class LoanController extends Controller
 
         $photoPath = null;
         if ($request->hasFile('photo')) {
-            $photoPath = $request->file('photo')->store('condition-reports', 'public');
+            $photoPath = $request->file('photo')->store('condition-reports', 'local');
         }
 
         DB::transaction(function () use ($assetLoan, $request, $photoPath, $scanData) {
-            $assetLoan->update([
-                'status' => LoanStatus::RETURNED,
-                'returned_at' => now(),
-            ]);
+            $assetLoan->markReturned($request->input('condition'));
 
             ConditionReport::create([
                 'asset_loan_id' => $assetLoan->id,
@@ -187,11 +180,6 @@ class LoanController extends Controller
                     ...$scanData,
                 ],
             ]);
-
-            $assetLoan->asset->update([
-                'condition' => $request->input('condition'),
-                'status' => 'available',
-            ]);
         });
 
         return response()->json($assetLoan->fresh(['asset', 'conditionReports']));
@@ -203,11 +191,12 @@ class LoanController extends Controller
             return response()->json(['message' => 'Loan cannot be overridden in current state.'], 422);
         }
 
+        if ($assetLoan->status === LoanStatus::RESERVED && ! $assetLoan->bookingAllowsHandover()) {
+            return response()->json(['message' => 'Pemesanan untuk aset ini tidak dalam status disetujui.'], 422);
+        }
+
         DB::transaction(function () use ($request, $assetLoan) {
-            $assetLoan->update([
-                'status' => LoanStatus::HANDED_OVER,
-                'handed_over_at' => $assetLoan->handed_over_at ?? now(),
-            ]);
+            $assetLoan->markHandedOver();
 
             LoanEvent::create([
                 'asset_loan_id' => $assetLoan->id,
@@ -231,7 +220,7 @@ class LoanController extends Controller
 
         $photoPath = null;
         if ($request->hasFile('photo')) {
-            $photoPath = $request->file('photo')->store('condition-reports', 'public');
+            $photoPath = $request->file('photo')->store('condition-reports', 'local');
         }
 
         $report = ConditionReport::create([
@@ -250,6 +239,34 @@ class LoanController extends Controller
         ]);
 
         return response()->json($report, 201);
+    }
+
+    /**
+     * The borrower, not the manager operating the device, must be the face in the frame.
+     */
+    private function evaluateBorrowerFace(AssetLoan $assetLoan, string $faceImage): VerificationStepOutcome
+    {
+        try {
+            $result = $this->faceVerificationService->verify($assetLoan->user, $faceImage);
+        } catch (RequestException|ConnectionException $error) {
+            $notEnrolled = $error instanceof RequestException && $error->response->status() === 404;
+
+            return new VerificationStepOutcome(
+                VerificationStage::FACE,
+                false,
+                $notEnrolled
+                    ? 'Peminjam belum mendaftarkan wajah.'
+                    : 'Layanan wajah tidak tersedia. Gunakan override manual.',
+            );
+        }
+
+        $matched = (bool) ($result['match'] ?? false);
+
+        return new VerificationStepOutcome(
+            VerificationStage::FACE,
+            $matched,
+            $matched ? null : 'Verifikasi wajah gagal.',
+        );
     }
 
     private function evaluateLocation(AssetLoan $assetLoan, Request $request): VerificationStepOutcome

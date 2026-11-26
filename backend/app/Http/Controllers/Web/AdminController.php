@@ -92,10 +92,10 @@ class AdminController extends Controller
 
         return view('admin.dashboard', [
             'totalBookings' => Booking::count(),
-            'pendingApprovals' => Approval::where('status', 'pending')->count(),
+            'pendingApprovals' => Approval::awaitingDecision()->count(),
             'activeResources' => Resource::where('is_active', true)->count(),
             'totalStrikes' => Strike::count(),
-            'recentApprovals' => Approval::where('status', 'pending')
+            'recentApprovals' => Approval::awaitingDecision()
                 ->with(['booking.user', 'booking.resource'])
                 ->latest()
                 ->limit(4)
@@ -164,10 +164,10 @@ class AdminController extends Controller
      */
     private function monthlyBookingTrend(int $months): array
     {
-        $counts = Booking::where('starts_at', '>=', $this->dashboardMonthStart($months))
+        $counts = Booking::where('starts_at', '>=', $this->dashboardMonthStart($months)->utc())
             ->select('starts_at')
             ->get()
-            ->countBy(fn (Booking $booking) => $booking->starts_at->format('Y-m'));
+            ->countBy(fn (Booking $booking) => $booking->starts_at->wib()->format('Y-m'));
 
         $items = $this->dashboardMonths($months)->map(fn (Carbon $month) => [
             'label' => $month->locale('id')->isoFormat('MMM'),
@@ -182,10 +182,10 @@ class AdminController extends Controller
      */
     private function monthlyApprovalTrend(int $months): array
     {
-        $counts = Approval::where('created_at', '>=', $this->dashboardMonthStart($months))
+        $counts = Approval::where('created_at', '>=', $this->dashboardMonthStart($months)->utc())
             ->select('created_at')
             ->get()
-            ->countBy(fn (Approval $approval) => $approval->created_at->format('Y-m'));
+            ->countBy(fn (Approval $approval) => $approval->created_at->wib()->format('Y-m'));
 
         $items = $this->dashboardMonths($months)->map(fn (Carbon $month) => [
             'label' => $month->locale('id')->isoFormat('MMM'),
@@ -281,7 +281,7 @@ class AdminController extends Controller
     {
         $items = Booking::with('resource')
             ->where('status', BookingStatus::COMPLETED->value)
-            ->whereBetween('starts_at', [now()->subDays(30), now()])
+            ->whereBetween('starts_at', [$this->dashboardPeriodStart($months), now()])
             ->whereHas('resource', fn ($query) => $query->where('type', 'room'))
             ->get()
             ->groupBy('resource_id')
@@ -303,7 +303,7 @@ class AdminController extends Controller
     {
         $items = Booking::with('resource')
             ->where('status', BookingStatus::COMPLETED->value)
-            ->whereBetween('starts_at', [now()->subDays(30), now()])
+            ->whereBetween('starts_at', [$this->dashboardPeriodStart($months), now()])
             ->whereHas('resource', fn ($query) => $query->where('type', 'room'))
             ->get()
             ->groupBy('resource_id')
@@ -324,7 +324,7 @@ class AdminController extends Controller
     private function popularAssetsChart(int $months): array
     {
         $items = AssetLoan::with('asset.resource')
-            ->whereBetween('created_at', [now()->subDays(30), now()])
+            ->whereBetween('created_at', [$this->dashboardPeriodStart($months), now()])
             ->get()
             ->groupBy('asset_id')
             ->map(fn (Collection $loans) => [
@@ -362,14 +362,18 @@ class AdminController extends Controller
         return $this->donutChart('Kondisi aset', 'Saat ini', $items);
     }
 
+    /**
+     * First instant of the oldest month shown, in WIB.
+     */
     private function dashboardMonthStart(int $months): Carbon
     {
-        return now()->subMonths($months - 1)->startOfMonth();
+        // Snap to the first of the month before subtracting, so the 31st cannot overflow.
+        return now()->wib()->startOfMonth()->subMonths($months - 1);
     }
 
     private function dashboardPeriodStart(int $months): Carbon
     {
-        return now()->subMonths($months);
+        return now()->subMonthsNoOverflow($months);
     }
 
     /**
@@ -377,7 +381,7 @@ class AdminController extends Controller
      */
     private function dashboardMonths(int $months): Collection
     {
-        return collect(CarbonPeriod::create($this->dashboardMonthStart($months), '1 month', now()->startOfMonth()));
+        return collect(CarbonPeriod::create($this->dashboardMonthStart($months), '1 month', now()->wib()->startOfMonth()));
     }
 
     /**
@@ -601,12 +605,7 @@ class AdminController extends Controller
     {
         $this->ensurePermission(Permission::RESOURCES_DELETE);
 
-        $hasActiveBookings = $resource->bookings()
-            ->whereIn('status', ['pending', 'approved', 'checked_in'])
-            ->where('ends_at', '>=', now())
-            ->exists();
-
-        if ($hasActiveBookings) {
+        if ($resource->hasActiveBookings()) {
             return back()->withErrors(['resource' => 'Ruangan atau aset masih memiliki pemesanan aktif. Selesaikan atau batalkan pemesanan terlebih dahulu.']);
         }
 
@@ -618,6 +617,11 @@ class AdminController extends Controller
     public function audit(Request $request)
     {
         $this->ensurePermission(Permission::AUDIT_VIEW);
+
+        $request->validate([
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date'],
+        ]);
 
         $query = AuditLog::with('user')->latest();
 
@@ -641,12 +645,14 @@ class AdminController extends Controller
             $query->where('auditable_type', $request->input('type'));
         }
 
+        $timezone = config('app.display_timezone');
+
         if ($request->filled('from')) {
-            $query->whereDate('created_at', '>=', $request->input('from'));
+            $query->where('created_at', '>=', Carbon::parse($request->input('from'), $timezone)->startOfDay()->utc());
         }
 
         if ($request->filled('to')) {
-            $query->whereDate('created_at', '<=', $request->input('to'));
+            $query->where('created_at', '<=', Carbon::parse($request->input('to'), $timezone)->endOfDay()->utc());
         }
 
         $logs = $query->paginate(30)->withQueryString();

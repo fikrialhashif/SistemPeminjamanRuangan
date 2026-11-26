@@ -4,7 +4,7 @@
 
 @section('content')
     @php
-        $today = now()->locale('id');
+        $today = now()->wib()->locale('id');
     @endphp
 
     <header class="plate">
@@ -138,7 +138,7 @@
                             </div>
                             <div class="ledger-when">
                                 @if($approval->expires_at)
-                                    {{ $approval->expires_at->isPast() ? 'Lewat ' : 'Hingga ' }}{{ $approval->expires_at->locale('id')->isoFormat('D MMM, HH:mm') }}
+                                    {{ $approval->expires_at->isPast() ? 'Lewat ' : 'Hingga ' }}{{ $approval->expires_at->wib()->locale('id')->isoFormat('D MMM, HH:mm') }}
                                 @else
                                     Tanpa batas
                                 @endif

@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Enums\BookingStatus;
+use App\Enums\LoanStatus;
 use App\Models\Booking;
 use App\Models\Setting;
 use App\Services\PenaltyService;
@@ -18,11 +19,16 @@ class ExpireNoShowBookings implements ShouldQueue
 
     public function handle(PenaltyService $penaltyService): void
     {
-        $checkInWindow = Setting::get('check_in_window_minutes', 15);
+        // Never mark a no-show while the user is still allowed to check in.
+        $noShowAfter = max(
+            Setting::get('check_in_window_minutes', 15),
+            Setting::get('checkin_window_after_minutes', 15),
+        );
 
         Booking::where('status', BookingStatus::APPROVED)
-            ->where('starts_at', '<=', now()->subMinutes($checkInWindow))
-            ->each(function (Booking $booking) use ($penaltyService) {
+            ->where('starts_at', '<', now()->subMinutes($noShowAfter))
+            ->whereDoesntHave('assetLoan', fn ($query) => $query->where('status', '!=', LoanStatus::RESERVED))
+            ->eachById(function (Booking $booking) use ($penaltyService) {
                 $booking->update(['status' => BookingStatus::NO_SHOW]);
                 $penaltyService->issueStrike($booking->user, 'No-show for booking #'.$booking->id, $booking);
             });

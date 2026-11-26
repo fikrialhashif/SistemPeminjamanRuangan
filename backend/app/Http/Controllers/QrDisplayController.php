@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\Permission;
 use App\Models\Resource;
 use App\Services\QrTokenService;
 use Illuminate\Http\Response;
@@ -14,6 +15,8 @@ class QrDisplayController extends Controller
 
     public function show(Resource $resource): Response
     {
+        $this->ensurePermission(Permission::RESOURCES_VIEW);
+
         return $this->render(
             title: 'Check-in '.$resource->name,
             kicker: 'QR pintu · statis',
@@ -28,6 +31,8 @@ class QrDisplayController extends Controller
 
     public function assetLabel(Resource $resource): Response
     {
+        $this->ensurePermission(Permission::RESOURCES_VIEW);
+
         abort_unless($resource->asset !== null, 404, 'Resource ini bukan aset.');
 
         return $this->render(

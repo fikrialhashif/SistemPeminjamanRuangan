@@ -81,14 +81,14 @@
                                 <td data-label="Status">
                                     <span class="tag {{ in_array($loan->status->value, ['returned', 'closed']) ? 'tag--plain' : 'tag--amber' }}">{{ $statusLabel }}</span>
                                     @if($loan->returned_at)
-                                        <div class="cell-sub">{{ $loan->returned_at->locale('id')->isoFormat('D MMM Y H:i') }}</div>
+                                        <div class="cell-sub">{{ $loan->returned_at->wib()->locale('id')->isoFormat('D MMM Y H:i') }}</div>
                                     @endif
                                 </td>
                                 <td data-label="Jatuh tempo">
                                     @if($loan->due_at)
                                         <div class="cell-time {{ $loan->due_at->isPast() && ! $loan->returned_at ? 'overdue' : '' }}">
-                                            {{ $loan->due_at->locale('id')->isoFormat('D MMM Y') }}
-                                            <span class="cell-time-sub">{{ $loan->due_at->format('H:i') }}</span>
+                                            {{ $loan->due_at->wib()->locale('id')->isoFormat('D MMM Y') }}
+                                            <span class="cell-time-sub">{{ $loan->due_at->wib()->format('H:i') }}</span>
                                         </div>
                                     @else
                                         <span class="cell-muted">&mdash;</span>

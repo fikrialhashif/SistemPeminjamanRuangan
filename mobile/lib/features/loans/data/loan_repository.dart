@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_error.dart';
 import '../../../core/network/dio_provider.dart';
+import '../../../core/network/pagination.dart';
 
 final loanRepositoryProvider = Provider<LoanRepository>(
   (ref) => LoanRepository(ref.read(dioProvider)),
@@ -14,14 +15,7 @@ class LoanRepository {
 
   Future<List<Map<String, dynamic>>> list({String? status}) async {
     try {
-      final response = await _dio.get(
-        '/loans',
-        queryParameters: status == null ? null : {'status': status},
-      );
-      final data = Map<String, dynamic>.from(response.data as Map);
-      return (data['data'] as List? ?? [])
-          .map((item) => Map<String, dynamic>.from(item as Map))
-          .toList();
+      return await fetchAllPages(_dio, '/loans', query: {'status': ?status});
     } catch (error) {
       throw mapDioError(error);
     }

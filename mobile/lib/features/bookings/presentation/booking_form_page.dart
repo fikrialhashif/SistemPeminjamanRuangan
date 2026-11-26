@@ -39,8 +39,15 @@ class _BookingFormPageState extends ConsumerState<BookingFormPage> {
   String? error;
   bool loading = false;
   bool faceLoading = true;
-  bool faceEnabled = false;
+  Map<String, dynamic>? faceStatus;
   bool faceEnrolled = false;
+
+  /// False while the face status is unknown, so the server decides.
+  bool _needsEnrollment(Map<String, dynamic>? resource) {
+    final status = faceStatus;
+    if (status == null || faceEnrolled) return false;
+    return faceVerificationRequired(status, resource?['type']);
+  }
 
   @override
   void initState() {
@@ -64,7 +71,7 @@ class _BookingFormPageState extends ConsumerState<BookingFormPage> {
       final status = await ref.read(faceRepositoryProvider).status();
       if (!mounted) return;
       setState(() {
-        faceEnabled = status['enabled'] == true;
+        faceStatus = status;
         faceEnrolled = status['enrolled'] == true;
         faceLoading = false;
       });
@@ -78,10 +85,7 @@ class _BookingFormPageState extends ConsumerState<BookingFormPage> {
     ref.invalidate(faceStatusProvider);
     if (!mounted) return;
     if (result == true) {
-      setState(() {
-        faceEnabled = true;
-        faceEnrolled = true;
-      });
+      setState(() => faceEnrolled = true);
     } else {
       await _loadFaceStatus();
     }
@@ -93,7 +97,7 @@ class _BookingFormPageState extends ConsumerState<BookingFormPage> {
       availabilityProvider(AvailabilityQuery(widget.resourceId, date)),
     );
     final resource = ref.watch(resourceDetailProvider(widget.resourceId));
-    final needsEnrollment = faceEnabled && !faceEnrolled;
+    final needsEnrollment = _needsEnrollment(resource.asData?.value);
 
     return Scaffold(
       body: SafeArea(
@@ -313,7 +317,8 @@ class _BookingFormPageState extends ConsumerState<BookingFormPage> {
       setState(() => error = 'Waktu selesai harus setelah mulai.');
       return;
     }
-    if (faceEnabled && !faceEnrolled) {
+    final resource = ref.read(resourceDetailProvider(widget.resourceId));
+    if (_needsEnrollment(resource.asData?.value)) {
       setState(
         () => error =
             'Daftarkan wajah terlebih dahulu sebelum membuat booking ruangan.',
@@ -339,8 +344,9 @@ class _BookingFormPageState extends ConsumerState<BookingFormPage> {
     } catch (e) {
       if (!mounted) return;
       if (e is ApiError && e.code == 'face_enrollment_required') {
+        // The server asks for enrollment, so show the banner from now on.
         setState(() {
-          faceEnabled = true;
+          faceStatus = const {'enabled': true};
           faceEnrolled = false;
         });
       }

@@ -54,8 +54,8 @@
                                 <td data-label="Jadwal">
                                     @if($approval->booking?->starts_at)
                                         <div class="cell-time">
-                                            {{ $approval->booking->starts_at->locale('id')->isoFormat('D MMM Y') }}
-                                            <span class="cell-time-sub">{{ $approval->booking->starts_at->format('H:i') }}&ndash;{{ $approval->booking->ends_at->format('H:i') }}</span>
+                                            {{ $approval->booking->starts_at->wib()->locale('id')->isoFormat('D MMM Y') }}
+                                            <span class="cell-time-sub">{{ $approval->booking->starts_at->wib()->format('H:i') }}&ndash;{{ $approval->booking->ends_at->wib()->format('H:i') }}</span>
                                         </div>
                                     @else
                                         <span class="cell-muted">&mdash;</span>
@@ -65,8 +65,8 @@
                                 <td data-label="Batas waktu">
                                     @if($approval->expires_at)
                                         <div class="cell-time {{ $approval->expires_at->isPast() ? 'overdue' : '' }}">
-                                            {{ $approval->expires_at->locale('id')->isoFormat('D MMM Y') }}
-                                            <span class="cell-time-sub">{{ $approval->expires_at->format('H:i') }}</span>
+                                            {{ $approval->expires_at->wib()->locale('id')->isoFormat('D MMM Y') }}
+                                            <span class="cell-time-sub">{{ $approval->expires_at->wib()->format('H:i') }}</span>
                                         </div>
                                     @else
                                         <span class="cell-muted">Tanpa batas</span>
