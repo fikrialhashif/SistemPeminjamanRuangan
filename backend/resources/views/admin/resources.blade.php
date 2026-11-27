@@ -94,7 +94,7 @@
                                             <a class="btn btn--ghost btn--sm" href="{{ route('resources.asset-label', $resource) }}" target="_blank" rel="noopener">Label aset</a>
                                         @endif
                                         @if(auth()->user()->hasPermission('resources.update'))
-                                            <form method="POST" action="{{ route('admin.resources.toggle', $resource) }}">
+                                            <form method="POST" action="{{ route('admin.resources.toggle', $resource) }}" data-confirm="{{ $resource->is_active ? 'Nonaktifkan' : 'Aktifkan' }} {{ $resource->name }}?">
                                                 @csrf
                                                 @method('PATCH')
                                                 <button type="submit" class="btn btn--ghost btn--sm">{{ $resource->is_active ? 'Nonaktifkan' : 'Aktifkan' }}</button>
@@ -139,10 +139,4 @@
             </form>
         </div>
     </dialog>
-
-    @if($errors->any())
-        <script>
-            document.getElementById('createResource').showModal();
-        </script>
-    @endif
 @endsection

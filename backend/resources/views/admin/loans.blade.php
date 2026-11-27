@@ -101,7 +101,7 @@
                                             <button type="submit" class="btn btn--primary btn--sm">Serahkan</button>
                                         </form>
                                     @elseif(in_array($loan->status->value, ['handed_over', 'in_use']) && auth()->user()->hasPermission('loans.update'))
-                                        <form method="POST" action="{{ route('admin.loans.return', $loan) }}" class="inline-form">
+                                        <form method="POST" action="{{ route('admin.loans.return', $loan) }}" class="inline-form" data-confirm="Kembalikan aset ini?">
                                             @csrf
                                             <select class="input input--sm" name="condition" required>
                                                 <option value="good">Baik</option>

@@ -197,13 +197,6 @@
         </aside>
 
         <main class="workspace">
-            @if(session('success'))
-                <div class="toast" role="status">
-                    <span class="toast-icon" aria-hidden="true">&#10003;</span>
-                    <span>{{ session('success') }}</span>
-                </div>
-            @endif
-
             @if($errors->any())
                 <div class="alert alert--page" role="alert">
                     @foreach($errors->all() as $error)
@@ -216,6 +209,32 @@
             @include('admin.partials.account-dialog')
         </main>
     </div>
+
+    <div class="toast-stack" aria-live="polite">
+        @if(session('success'))
+            <div class="toast" role="status" data-toast>
+                <span class="toast-icon" aria-hidden="true">&#10003;</span>
+                <span class="toast-message">{{ session('success') }}</span>
+                <span class="toast-progress" aria-hidden="true"></span>
+            </div>
+        @endif
+    </div>
+
+    <dialog id="confirmDialog" class="modal confirm-dialog" aria-labelledby="confirmDialogTitle" aria-describedby="confirmDialogMessage">
+        <div class="modal-head">
+            <div>
+                <h2 class="modal-title" id="confirmDialogTitle">Konfirmasi</h2>
+                <p class="modal-desc" id="confirmDialogMessage"></p>
+            </div>
+            <button type="button" class="modal-close" data-close-dialog aria-label="Tutup dialog">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-actions">
+                <button type="button" class="btn btn--ghost" data-close-dialog>Batal</button>
+                <button type="button" class="btn btn--primary" data-confirm-accept>Ya, lanjutkan</button>
+            </div>
+        </div>
+    </dialog>
 
     <script>
         document.querySelectorAll('[data-open-dialog]').forEach(function (button) {
@@ -274,13 +293,78 @@
             });
         });
 
-        document.querySelectorAll('[data-confirm]').forEach(function (form) {
+        document.querySelectorAll('[data-toast]').forEach(function (toast) {
+            window.setTimeout(function () {
+                toast.classList.add('is-leaving');
+
+                window.setTimeout(function () {
+                    toast.remove();
+                }, 220);
+            }, 5000);
+        });
+
+        var confirmDialog = document.getElementById('confirmDialog');
+        var confirmMessage = document.getElementById('confirmDialogMessage');
+        var confirmAccept = confirmDialog ? confirmDialog.querySelector('[data-confirm-accept]') : null;
+        var pendingForm = null;
+        var pendingSubmitter = null;
+        var confirmedForm = null;
+
+        document.querySelectorAll('form[data-confirm]').forEach(function (form) {
             form.addEventListener('submit', function (event) {
-                if (! window.confirm(form.dataset.confirm)) {
-                    event.preventDefault();
+                if (confirmedForm === form) {
+                    confirmedForm = null;
+
+                    return;
+                }
+
+                event.preventDefault();
+                pendingForm = form;
+                pendingSubmitter = event.submitter || null;
+
+                if (confirmDialog && confirmMessage) {
+                    confirmMessage.textContent = (pendingSubmitter && pendingSubmitter.dataset.confirm)
+                        || form.dataset.confirm;
+                    confirmDialog.showModal();
                 }
             });
         });
+
+        if (confirmDialog) {
+            confirmDialog.addEventListener('close', function () {
+                pendingForm = null;
+                pendingSubmitter = null;
+            });
+        }
+
+        if (confirmAccept) {
+            confirmAccept.addEventListener('click', function () {
+                if (! pendingForm) {
+                    confirmDialog.close();
+
+                    return;
+                }
+
+                var form = pendingForm;
+                var submitter = pendingSubmitter;
+
+                pendingForm = null;
+                pendingSubmitter = null;
+                confirmedForm = form;
+
+                confirmDialog.close();
+
+                if (submitter) {
+                    form.requestSubmit(submitter);
+                } else {
+                    form.requestSubmit();
+                }
+
+                window.setTimeout(function () {
+                    confirmedForm = null;
+                }, 0);
+            });
+        }
 
         document.querySelectorAll('form').forEach(function (form) {
             form.addEventListener('submit', function (event) {
@@ -298,10 +382,98 @@
             });
         });
 
-        @if(old('account_popup'))
-            var accountDialog = document.getElementById('accountDialog');
-            if (accountDialog) {
-                accountDialog.showModal();
+        function clearFieldError(field) {
+            field.classList.remove('input--error');
+
+            var error = field.nextElementSibling;
+
+            if (error && error.classList.contains('field-error')) {
+                error.remove();
+            }
+        }
+
+        function showFieldError(field, message) {
+            field.classList.add('input--error');
+
+            var error = field.nextElementSibling;
+
+            if (! error || ! error.classList.contains('field-error')) {
+                error = document.createElement('span');
+                error.className = 'field-error';
+                error.setAttribute('role', 'alert');
+                field.insertAdjacentElement('afterend', error);
+            }
+
+            error.textContent = message;
+        }
+
+        document.querySelectorAll('dialog.modal form').forEach(function (form) {
+            form.addEventListener('submit', function () {
+                var dialog = form.closest('dialog');
+                var marker = form.querySelector('input[name="form_marker"]');
+
+                if (! marker) {
+                    marker = document.createElement('input');
+                    marker.type = 'hidden';
+                    marker.name = 'form_marker';
+                    form.appendChild(marker);
+                }
+
+                marker.value = dialog ? dialog.id : '';
+            });
+
+            form.addEventListener('invalid', function (event) {
+                event.preventDefault();
+
+                var field = event.target;
+                var message = field.validity.valueMissing ? 'Wajib diisi.' : field.validationMessage;
+
+                showFieldError(field, message);
+
+                var firstInvalid = form.querySelector(':invalid');
+
+                if (field === firstInvalid) {
+                    window.setTimeout(function () {
+                        firstInvalid.focus();
+                    }, 0);
+                }
+            }, true);
+
+            form.addEventListener('input', function (event) {
+                if (event.target.validity.valid) {
+                    clearFieldError(event.target);
+                }
+            });
+
+            form.addEventListener('change', function (event) {
+                if (event.target.validity.valid) {
+                    clearFieldError(event.target);
+                }
+            });
+        });
+
+        @if($errors->any())
+            var formMarker = @json(old('form_marker'));
+            var errorScope = formMarker ? document.getElementById(formMarker) : document;
+            var validationErrors = @json($errors->messages());
+
+            if (errorScope) {
+                errorScope.querySelectorAll('form [name]:not([type="hidden"])').forEach(function (field) {
+                    var key = field.name.replace(/\[([^\]]*)\]/g, function (_, part) {
+                        return part === '' ? '.0' : '.' + part;
+                    });
+                    var messages = [field.name, key].flatMap(function (candidate) {
+                        return validationErrors[candidate] || [];
+                    });
+
+                    if (messages.length) {
+                        showFieldError(field, messages[0]);
+                    }
+                });
+
+                if (errorScope.tagName === 'DIALOG') {
+                    errorScope.showModal();
+                }
             }
         @endif
     </script>

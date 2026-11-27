@@ -60,16 +60,14 @@ class BookingRequestTest extends TestCase
         $this->assertSame(BookingStatus::CANCELLED, $booking->fresh()->status);
     }
 
-    // [check-in window after, no-show limit, minutes since start, expected]
-    #[TestWith([45, 15, 20, BookingStatus::APPROVED])]
-    #[TestWith([45, 15, 45, BookingStatus::APPROVED])]
-    #[TestWith([45, 15, 46, BookingStatus::NO_SHOW])]
-    #[TestWith([15, 30, 20, BookingStatus::APPROVED])]
-    #[TestWith([15, 30, 31, BookingStatus::NO_SHOW])]
-    public function test_no_show_waits_until_check_in_is_closed(int $checkInAfter, int $noShow, int $minutes, BookingStatus $expected): void
+    // [check-in window after, minutes since start, expected]
+    #[TestWith([45, 20, BookingStatus::APPROVED])]
+    #[TestWith([45, 45, BookingStatus::APPROVED])]
+    #[TestWith([45, 46, BookingStatus::NO_SHOW])]
+    #[TestWith([15, 20, BookingStatus::NO_SHOW])]
+    public function test_no_show_waits_until_check_in_is_closed(int $checkInAfter, int $minutes, BookingStatus $expected): void
     {
         Setting::set('checkin_window_after_minutes', $checkInAfter, 'integer');
-        Setting::set('check_in_window_minutes', $noShow, 'integer');
         $booking = $this->booking($this->resource(), now()->subMinutes($minutes));
 
         app()->call([new ExpireNoShowBookings, 'handle']);

@@ -58,6 +58,19 @@ class MasterDataTest extends TestCase
         $this->assertSame('Ruang Rapat Besar', $category->fresh()->name);
     }
 
+    public function test_validation_errors_are_passed_to_the_modal(): void
+    {
+        $admin = $this->userWithRole(RoleEnum::ADMIN);
+
+        $this->actingAs($admin)
+            ->from(route('admin.categories'))
+            ->followingRedirects()
+            ->post(route('admin.categories.store'), ['name' => '', 'type' => 'room'])
+            ->assertOk()
+            ->assertSee('createCategory', false)
+            ->assertSee('The name field is required.', false);
+    }
+
     public function test_admin_can_manage_facilities(): void
     {
         $admin = $this->userWithRole(RoleEnum::ADMIN);

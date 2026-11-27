@@ -117,7 +117,7 @@
                 <button type="button" class="modal-close" data-close-dialog aria-label="Tutup dialog">&times;</button>
             </div>
             <div class="modal-body">
-                <form method="POST" action="{{ route('admin.categories.update', $category) }}">
+                <form method="POST" action="{{ route('admin.categories.update', $category) }}" data-confirm="Simpan perubahan kategori ini?">
                     @csrf
                     @method('PUT')
                     <div class="form-grid">

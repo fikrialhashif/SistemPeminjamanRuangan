@@ -74,11 +74,11 @@
                                 </td>
                                 <td data-label="Keputusan" class="data-actions">
                                     @if($decidableIds->contains($approval->id))
-                                        <form method="POST" action="{{ route('admin.approvals.approve', $approval) }}" class="decide">
+                                        <form method="POST" action="{{ route('admin.approvals.approve', $approval) }}" class="decide" data-confirm="Setujui permintaan ini?">
                                             @csrf
                                             <input type="text" name="notes" class="input" placeholder="Catatan (boleh kosong)" aria-label="Catatan untuk permintaan {{ $approval->booking->title ?? '#'.$approval->booking_id }}">
                                             <button type="submit" class="btn btn--primary btn--sm">Setujui</button>
-                                            <button type="submit" formaction="{{ route('admin.approvals.reject', $approval) }}" class="btn btn--reject btn--sm">Tolak</button>
+                                            <button type="submit" formaction="{{ route('admin.approvals.reject', $approval) }}" class="btn btn--reject btn--sm" data-confirm="Tolak permintaan ini?">Tolak</button>
                                         </form>
                                     @else
                                         <span class="cell-muted">Anda tidak punya izin untuk memutuskan.</span>

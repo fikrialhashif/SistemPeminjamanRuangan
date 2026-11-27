@@ -19,7 +19,7 @@
             <span class="tag {{ $resource->is_active ? '' : 'tag--plain' }}">{{ $resource->is_active ? 'Aktif' : 'Nonaktif' }}</span>
         </div>
         <div class="panel-body">
-            <form method="POST" action="{{ route('admin.resources.update', $resource) }}">
+            <form method="POST" action="{{ route('admin.resources.update', $resource) }}" data-confirm="Simpan perubahan ruangan atau aset ini?">
                 @csrf
                 @method('PUT')
                 @include('admin.partials.resource-fields', ['resource' => $resource, 'locations' => $locations, 'roomCategories' => $roomCategories, 'assetCategories' => $assetCategories, 'facilities' => $facilities, 'isEdit' => true])

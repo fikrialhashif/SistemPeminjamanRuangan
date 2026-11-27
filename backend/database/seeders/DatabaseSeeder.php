@@ -147,7 +147,6 @@ class DatabaseSeeder extends Seeder
             'cancellation_minutes_before' => 120,
         ]);
 
-        Setting::set('check_in_window_minutes', 15, 'integer');
         Setting::set('checkin_window_before_minutes', 15, 'integer');
         Setting::set('checkin_window_after_minutes', 15, 'integer');
         Setting::set('checkin_failure_strike_threshold', 3, 'integer');

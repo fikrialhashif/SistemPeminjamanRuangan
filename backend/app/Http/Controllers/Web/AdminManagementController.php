@@ -97,8 +97,8 @@ class AdminManagementController extends Controller
         foreach ($definitions as $key => $definition) {
             $rules["settings.{$key}"] = match ($definition['type']) {
                 'boolean' => ['nullable', 'boolean'],
-                'integer' => ['nullable', 'integer', 'min:0'],
-                'float' => ['nullable', 'numeric'],
+                'integer' => ['nullable', 'integer', 'min:'.($definition['min'] ?? 0)],
+                'float' => ['nullable', 'numeric', 'min:'.($definition['min'] ?? 0)],
                 default => ['nullable', 'string'],
             };
         }
@@ -571,10 +571,9 @@ class AdminManagementController extends Controller
     {
         return [
             'checkin_window_before_minutes' => ['group' => 'Kehadiran & verifikasi', 'label' => 'Batas waktu masuk sebelum jadwal', 'type' => 'integer', 'default' => 15, 'hint' => 'Berapa menit sebelum jadwal masuk masih diterima.'],
-            'checkin_window_after_minutes' => ['group' => 'Kehadiran & verifikasi', 'label' => 'Batas waktu masuk setelah jadwal', 'type' => 'integer', 'default' => 15, 'hint' => 'Berapa menit setelah jadwal masuk masih diterima.'],
-            'check_in_window_minutes' => ['group' => 'Kehadiran & verifikasi', 'label' => 'Batas masuk sebelum dinyatakan tidak hadir', 'type' => 'integer', 'default' => 15, 'hint' => 'Dipakai untuk menandai pemesanan yang tidak dihadiri. Tidak berlaku lebih cepat dari batas waktu masuk setelah jadwal.'],
+            'checkin_window_after_minutes' => ['group' => 'Kehadiran & verifikasi', 'label' => 'Batas waktu masuk setelah jadwal', 'type' => 'integer', 'default' => 15, 'hint' => 'Berapa menit setelah jadwal masuk masih diterima. Setelah batas ini, pemesanan yang belum check-in dinyatakan tidak hadir.'],
             'face_verification_enabled' => ['group' => 'Kehadiran & verifikasi', 'label' => 'Wajib verifikasi wajah untuk aset', 'type' => 'boolean', 'default' => false, 'hint' => 'Ruangan selalu memerlukan verifikasi wajah.'],
-            'checkin_failure_strike_threshold' => ['group' => 'Kehadiran & verifikasi', 'label' => 'Batas gagal masuk sebelum pelanggaran', 'type' => 'integer', 'default' => 3, 'hint' => 'Jumlah kegagalan sebelum pelanggaran dicatat.'],
+            'checkin_failure_strike_threshold' => ['group' => 'Kehadiran & verifikasi', 'label' => 'Batas gagal masuk sebelum pelanggaran', 'type' => 'integer', 'default' => 3, 'min' => 1, 'hint' => 'Jumlah kegagalan sebelum pelanggaran dicatat. Minimal 1.'],
             'gps_accuracy_threshold_meters' => ['group' => 'Lokasi', 'label' => 'Akurasi lokasi maksimum (meter)', 'type' => 'integer', 'default' => 50, 'hint' => 'Nilai akurasi yang masih diterima.'],
             'gps_freshness_seconds' => ['group' => 'Lokasi', 'label' => 'Umur data lokasi maksimum (detik)', 'type' => 'integer', 'default' => 30, 'hint' => 'Data lokasi yang lebih lama akan ditolak.'],
             'gps_max_speed_mps' => ['group' => 'Lokasi', 'label' => 'Kecepatan perpindahan maksimum (m/s)', 'type' => 'integer', 'default' => 100, 'hint' => 'Untuk mendeteksi lompatan lokasi.'],

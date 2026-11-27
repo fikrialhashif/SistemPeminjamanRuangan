@@ -120,7 +120,7 @@
                 <button type="button" class="modal-close" data-close-dialog aria-label="Tutup dialog">&times;</button>
             </div>
             <div class="modal-body">
-                <form method="POST" action="{{ route('admin.users.update', $user) }}">
+                <form method="POST" action="{{ route('admin.users.update', $user) }}" data-confirm="Simpan perubahan pengguna ini?">
                     @csrf
                     @method('PUT')
                     @include('admin.partials.user-fields', ['user' => $user, 'roles' => $roles, 'departments' => $departments, 'roleLabels' => $roleLabels, 'isEdit' => true, 'prefix' => 'editUser'.$user->id])

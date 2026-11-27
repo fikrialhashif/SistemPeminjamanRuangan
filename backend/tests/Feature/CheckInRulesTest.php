@@ -80,6 +80,42 @@ class CheckInRulesTest extends TestCase
             ->assertSee('Ruangan selalu memerlukan verifikasi wajah.');
     }
 
+    public function test_settings_page_uses_one_check_in_window_field(): void
+    {
+        $this->actingAs($this->userWithRole(RoleEnum::ADMIN))
+            ->get(route('admin.settings'))
+            ->assertOk()
+            ->assertSee('Batas waktu masuk setelah jadwal')
+            ->assertDontSee('Batas masuk sebelum dinyatakan tidak hadir')
+            ->assertSee('Minimal 1.');
+    }
+
+    public function test_settings_reject_negative_number_and_zero_threshold(): void
+    {
+        $this->actingAs($this->userWithRole(RoleEnum::ADMIN))
+            ->put(route('admin.settings.update'), [
+                'settings' => [
+                    'checkin_window_after_minutes' => '-1',
+                    'checkin_failure_strike_threshold' => '0',
+                ],
+            ])
+            ->assertSessionHasErrors([
+                'settings.checkin_window_after_minutes' => 'The settings.checkin window after minutes field must be at least 0.',
+                'settings.checkin_failure_strike_threshold' => 'The settings.checkin failure strike threshold field must be at least 1.',
+            ]);
+    }
+
+    public function test_settings_accepts_minimum_strike_threshold(): void
+    {
+        $this->actingAs($this->userWithRole(RoleEnum::ADMIN))
+            ->put(route('admin.settings.update'), [
+                'settings' => ['checkin_failure_strike_threshold' => '1'],
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(1, Setting::get('checkin_failure_strike_threshold'));
+    }
+
     public function test_check_in_returns_422_when_the_room_has_no_location(): void
     {
         $room = Resource::create(['name' => 'Tanpa lokasi', 'type' => 'room', 'is_active' => true]);

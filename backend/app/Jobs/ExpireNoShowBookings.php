@@ -20,10 +20,7 @@ class ExpireNoShowBookings implements ShouldQueue
     public function handle(PenaltyService $penaltyService): void
     {
         // Never mark a no-show while the user is still allowed to check in.
-        $noShowAfter = max(
-            Setting::get('check_in_window_minutes', 15),
-            Setting::get('checkin_window_after_minutes', 15),
-        );
+        $noShowAfter = Setting::get('checkin_window_after_minutes', 15);
 
         Booking::where('status', BookingStatus::APPROVED)
             ->where('starts_at', '<', now()->subMinutes($noShowAfter))

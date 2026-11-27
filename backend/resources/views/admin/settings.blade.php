@@ -22,7 +22,7 @@
         </div>
     </header>
 
-    <form method="POST" action="{{ route('admin.settings.update') }}">
+    <form method="POST" action="{{ route('admin.settings.update') }}" data-confirm="Simpan perubahan pengaturan?">
         @csrf
         @method('PUT')
 
@@ -53,7 +53,7 @@
                                             id="setting_{{ $key }}"
                                             name="settings[{{ $key }}]"
                                             value="{{ old('settings.'.$key, $values[$key]) }}"
-                                            @if($definition['type'] !== 'string') step="{{ $definition['type'] === 'float' ? '0.01' : '1' }}" @endif
+                                            @if($definition['type'] !== 'string') min="{{ $definition['min'] ?? 0 }}" @endif
                                             @disabled(! $canUpdate)
                                         >
                                         <span class="field-hint">{{ $definition['hint'] }}</span>

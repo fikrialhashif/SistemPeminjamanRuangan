@@ -100,7 +100,7 @@
                 <button type="button" class="modal-close" data-close-dialog aria-label="Tutup dialog">&times;</button>
             </div>
             <div class="modal-body">
-                <form method="POST" action="{{ route('admin.facilities.update', $facility) }}">
+                <form method="POST" action="{{ route('admin.facilities.update', $facility) }}" data-confirm="Simpan perubahan fasilitas ini?">
                     @csrf
                     @method('PUT')
                     <div class="form-grid">

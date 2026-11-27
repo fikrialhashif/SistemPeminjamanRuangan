@@ -16,7 +16,7 @@
                 </div>
             @endif
 
-            <form method="POST" action="{{ route('admin.profile.update') }}">
+            <form method="POST" action="{{ route('admin.profile.update') }}" data-confirm="Simpan nama tampilan?">
                 @csrf
                 @method('PUT')
                 <input type="hidden" name="account_popup" value="1">
@@ -33,7 +33,7 @@
                 </div>
             </form>
 
-            <form method="POST" action="{{ route('admin.password.update') }}">
+            <form method="POST" action="{{ route('admin.password.update') }}" data-confirm="Ganti kata sandi?">
                 @csrf
                 @method('PUT')
                 <input type="hidden" name="account_popup" value="1">

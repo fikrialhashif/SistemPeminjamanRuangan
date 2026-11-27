@@ -931,6 +931,11 @@ button {
     box-shadow: var(--focus);
 }
 
+.input--error,
+.input--error:focus-visible {
+    border-color: var(--danger);
+}
+
 select.input {
     appearance: none;
     padding-right: 34px;
@@ -965,18 +970,89 @@ textarea.input {
 
 /* ---------- Alerts ---------- */
 
-.toast {
+.toast-stack {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 100;
     display: flex;
-    align-items: center;
+    flex-direction: column;
     gap: 10px;
-    margin-bottom: 22px;
-    padding: 12px 16px;
+    width: min(360px, calc(100vw - 32px));
+    pointer-events: none;
+}
+
+.toast {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    overflow: hidden;
+    padding: 14px 16px 18px;
     border: 1px solid var(--line-strong);
     border-left: 4px solid var(--forest);
     border-radius: 4px;
     background: var(--paper);
+    box-shadow: 0 18px 40px -18px rgba(22, 56, 43, 0.45);
     font-size: 13.5px;
     font-weight: 500;
+    pointer-events: auto;
+    animation: toast-in 220ms ease-out both;
+}
+
+.toast.is-leaving {
+    animation: toast-out 180ms ease-in forwards;
+}
+
+.toast-message {
+    flex: 1;
+    padding-top: 1px;
+}
+
+.toast-progress {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background: var(--forest);
+    transform-origin: left;
+    animation: toast-progress 5s linear forwards;
+}
+
+@keyframes toast-in {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+}
+
+@keyframes toast-out {
+    to {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+}
+
+@keyframes toast-progress {
+    to {
+        transform: scaleX(0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .toast,
+    .toast.is-leaving,
+    .toast-progress {
+        animation: none;
+    }
+}
+
+@media (max-width: 600px) {
+    .toast-stack {
+        right: 16px;
+        bottom: 16px;
+    }
 }
 
 .toast-icon {
@@ -1090,6 +1166,10 @@ a.pager-link:hover {
     background: var(--paper);
     color: var(--ink);
     box-shadow: 0 40px 90px -30px rgba(22, 56, 43, 0.6);
+}
+
+.confirm-dialog {
+    width: min(420px, calc(100vw - 32px));
 }
 
 .modal::backdrop {
@@ -1367,6 +1447,12 @@ a.pager-link:hover {
 
 .field-hint {
     color: var(--muted-2);
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+.field-error {
+    color: var(--danger);
     font-size: 12px;
     line-height: 1.35;
 }

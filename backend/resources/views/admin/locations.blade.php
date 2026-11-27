@@ -114,7 +114,7 @@
                 <button type="button" class="modal-close" data-close-dialog aria-label="Tutup dialog">&times;</button>
             </div>
             <div class="modal-body">
-                <form method="POST" action="{{ route('admin.locations.update', $location) }}">
+                <form method="POST" action="{{ route('admin.locations.update', $location) }}" data-confirm="Simpan perubahan lokasi ini?">
                     @csrf
                     @method('PUT')
                     @include('admin.partials.location-fields', ['location' => $location, 'prefix' => 'editLocation'.$location->id])
